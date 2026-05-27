@@ -48,10 +48,17 @@ html.theme-light {
   cursor: pointer;
   transition: all 0.2s ease;
 }
-.data-source-bar .ds-btn:hover {
+.data-source-bar .ds-btn:hover:not(.active):not(.disabled) {
   color: var(--ink);
-  background: oklch(1 0 0 / 0.08);
-  border-color: var(--border-strong);
+  background: oklch(1 0 0 / 0.1);
+  border-color: oklch(0.7 0.18 295 / 0.55);
+  box-shadow:
+    inset 0 0 0 1px oklch(0.7 0.18 295 / 0.35),
+    0 6px 18px -10px oklch(0.7 0.18 295 / 0.55);
+  transform: translateY(-1px);
+}
+.data-source-bar .ds-btn:active:not(.disabled) {
+  transform: translateY(0);
 }
 .data-source-bar .ds-btn.active {
   background: linear-gradient(135deg, #7c3aed, #0891b2);
@@ -60,11 +67,26 @@ html.theme-light {
   box-shadow: 0 4px 16px -4px rgba(124, 58, 237, 0.5);
   font-weight: 600;
 }
+.data-source-bar .ds-btn.active:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 12px 30px -8px rgba(124, 58, 237, 0.75),
+    0 0 0 2px oklch(1 0 0 / 0.18),
+    inset 0 1px 0 oklch(1 0 0 / 0.35);
+  filter: brightness(1.15) saturate(1.1);
+}
 
 .theme-light .data-source-bar .ds-btn.active {
   background: linear-gradient(135deg, #7c3aed, #0891b2);
   color: white;
   box-shadow: 0 4px 16px -4px rgba(124, 58, 237, 0.4);
+}
+.theme-light .data-source-bar .ds-btn.active:hover {
+  box-shadow:
+    0 12px 30px -8px rgba(124, 58, 237, 0.6),
+    0 0 0 2px oklch(1 0 0 / 0.4),
+    inset 0 1px 0 oklch(1 0 0 / 0.35);
+  filter: brightness(1.12) saturate(1.1);
 }
 .data-source-bar .ds-status {
   margin-left: auto;
@@ -105,10 +127,13 @@ html.theme-light {
   border-color: rgba(0, 0, 0, 0.1);
   color: #475569;
 }
-.theme-light .data-source-bar .ds-btn:hover {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(0, 0, 0, 0.15);
+.theme-light .data-source-bar .ds-btn:hover:not(.active):not(.disabled) {
+  background: oklch(0.7 0.18 295 / 0.1);
+  border-color: oklch(0.55 0.2 295 / 0.55);
   color: #1e293b;
+  box-shadow:
+    inset 0 0 0 1px oklch(0.55 0.2 295 / 0.35),
+    0 6px 18px -10px oklch(0.55 0.2 295 / 0.5);
 }
 
 /* Inline API connect panel */
