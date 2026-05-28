@@ -61,6 +61,7 @@ function dataSourceBar() {
     lastUpdated: s.lastUpdated,
     apiPanelOpen: s.apiPanelOpen,
     pendingBoardId: s.pendingBoardId,
+    loadProgress: s.loadProgress,
   });
 }
 

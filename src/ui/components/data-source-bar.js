@@ -5,6 +5,7 @@ import {
   setApiPanelOpen,
 } from '../../app/actions.js';
 import { renderApiPanel } from './api-panel.js';
+import { renderProgressOverlay } from './progress-overlay.js';
 
 function formatLastUpdated(date) {
   if (!date) return '';
@@ -43,7 +44,7 @@ function hiddenFileInput() {
 }
 
 export function renderDataSource({
-  activeSource, isRefreshing, lastUpdated, apiPanelOpen, pendingBoardId,
+  activeSource, isRefreshing, lastUpdated, apiPanelOpen, pendingBoardId, loadProgress,
 }) {
   const container = el('div', {}, []);
   const apiHost = el('div', {}, []);
@@ -100,10 +101,15 @@ export function renderDataSource({
       'Refresh',
     ]);
 
+    const progressNode = renderProgressOverlay({ progress: loadProgress });
+    const trailing = progressNode
+      ? progressNode
+      : el('span', { class: 'ds-status' }, [status]);
+
     return el('div', { class: 'data-source-bar' }, [
       el('span', { class: 'ds-label' }, ['Data source']),
       demoBtn, apiBtn, fileBtn, fileInput, refresh,
-      el('span', { class: 'ds-status' }, [status]),
+      trailing,
     ]);
   }
 

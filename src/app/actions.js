@@ -37,6 +37,36 @@ export function clearError() {
   setState({ error: null });
 }
 
+const LOAD_STEPS = {
+  connect:  { label: 'Connecting to Jira…',     percent: 15 },
+  fetch:    { label: 'Pulling sprint data…',    percent: 55 },
+  process:  { label: 'Converting issues…',      percent: 85 },
+  done:     { label: 'Done',                    percent: 100 },
+  parse:    { label: 'Reading file…',           percent: 35 },
+};
+
+function setProgress(step, flow) {
+  if (!step) {
+    setState({ loadProgress: null });
+    return;
+  }
+  const meta = LOAD_STEPS[step];
+  const prevFlow = getState().loadProgress?.flow;
+  setState({
+    loadProgress: {
+      step, label: meta.label, percent: meta.percent,
+      flow: flow || prevFlow || 'api',
+    },
+  });
+}
+
+// Hold the "Done" state briefly so the user sees 100% before it disappears.
+async function finishProgress() {
+  setProgress('done');
+  await new Promise((r) => setTimeout(r, 450));
+  setProgress(null);
+}
+
 export function showError(message) {
   setState({ error: message, isRefreshing: false });
 }
@@ -69,6 +99,7 @@ export async function logout() {
       isRefreshing: false,
       apiPanelOpen: false,
       pendingBoardId: '',
+      loadProgress: null,
     });
   } catch (e) {
     setState({ error: `Logout failed: ${e.message}` });
@@ -91,11 +122,15 @@ export function loadDemo() {
 
 export async function loadFromFile(file) {
   try {
+    setProgress('parse', 'file');
     const rawIssues = await parseFile(file);
     if (!rawIssues.length) throw new Error('File parsed but contained no issues.');
+    setProgress('process');
     const sprints = buildSprintsFromIssues(rawIssues, getState().today);
     applyLoadedSprints(sprints, `File · ${file.name}`, 'file');
+    await finishProgress();
   } catch (e) {
+    setProgress(null);
     showError(e.message || String(e));
   }
 }
@@ -106,17 +141,22 @@ export async function loadFromApi(boardId) {
     return false;
   }
   try {
+    setProgress('connect', 'api');
     const workerUrl = await getWorkerUrl();
     if (!workerUrl) throw new Error('Worker URL not configured in Firebase database.');
 
     localStorage.setItem(BOARD_ID_KEY, boardId);
+    setProgress('fetch');
     const raw = await fetchAllFromWorker(workerUrl, boardId);
     if (!raw.length) throw new Error('No issues found. Check Board ID and Worker configuration.');
 
+    setProgress('process');
     const sprints = buildSprintsFromIssues(raw, getState().today);
     applyLoadedSprints(sprints, `Jira API · Board ${boardId}`, 'api', { apiPanelOpen: false });
+    await finishProgress();
     return true;
   } catch (e) {
+    setProgress(null);
     showError(e.message || String(e));
     return false;
   }
@@ -136,14 +176,19 @@ export async function refreshFromApi() {
 
   setState({ isRefreshing: true });
   try {
+    setProgress('connect', 'api');
     const workerUrl = await getWorkerUrl();
     if (!workerUrl) throw new Error('Worker URL not configured in Firebase.');
+    setProgress('fetch');
     const raw = await fetchAllFromWorker(workerUrl, boardId);
     if (!raw.length) throw new Error('No issues found. Check Worker environment variables and Board ID.');
 
+    setProgress('process');
     const sprints = buildSprintsFromIssues(raw, getState().today);
     applyLoadedSprints(sprints, `Jira API · Board ${boardId}`, 'api');
+    await finishProgress();
   } catch (e) {
+    setProgress(null);
     showError(e.message || String(e));
   }
 }

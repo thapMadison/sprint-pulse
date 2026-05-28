@@ -595,3 +595,139 @@ html.theme-light {
 .theme-light .api-panel .config-value {
   background: oklch(1 0 0 / 0.5);
 }
+
+/* ============================================================
+   Load / refresh inline progress strip (lives inside data-source-bar)
+   ============================================================ */
+.progress-strip {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 320px;
+  max-width: 640px;
+  animation: progress-fade-in 200ms ease;
+}
+.progress-strip-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.progress-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid oklch(0.7 0.18 295 / 0.25);
+  border-top-color: var(--violet);
+  animation: spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+.progress-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+.progress-percent {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.progress-bar-track {
+  flex: 1 1 80px;
+  min-width: 60px;
+  height: 4px;
+  border-radius: 999px;
+  background: oklch(1 0 0 / 0.08);
+  overflow: hidden;
+  position: relative;
+}
+.theme-light .progress-bar-track {
+  background: oklch(0.6 0.02 270 / 0.15);
+}
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--violet), var(--cyan));
+  transition: width 350ms cubic-bezier(.4,.2,.2,1);
+  position: relative;
+  overflow: hidden;
+}
+.progress-bar-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg,
+    transparent,
+    oklch(1 0 0 / 0.4),
+    transparent);
+  animation: progress-shimmer 1.4s linear infinite;
+}
+.progress-steps {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.progress-step {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.45;
+  transition: opacity 200ms ease;
+}
+.progress-step.active,
+.progress-step.done { opacity: 1; }
+.progress-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: oklch(1 0 0 / 0.12);
+  border: 1.5px solid oklch(1 0 0 / 0.2);
+  transition: background 250ms ease, border-color 250ms ease, transform 250ms ease;
+}
+.theme-light .progress-dot {
+  background: oklch(0.6 0.02 270 / 0.15);
+  border-color: oklch(0.6 0.02 270 / 0.3);
+}
+.progress-step.done .progress-dot {
+  background: var(--lime);
+  border-color: var(--lime);
+  box-shadow: 0 0 8px oklch(0.84 0.18 130 / 0.6);
+}
+.progress-step.active .progress-dot {
+  background: var(--violet);
+  border-color: var(--violet);
+  box-shadow: 0 0 0 4px oklch(0.7 0.18 295 / 0.2);
+  animation: progress-pulse 1.2s ease-in-out infinite;
+}
+.progress-step-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-2);
+}
+
+@keyframes progress-fade-in {
+  from { opacity: 0; transform: translateX(6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes progress-shimmer {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+@keyframes progress-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.25); }
+}

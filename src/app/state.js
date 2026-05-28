@@ -13,6 +13,7 @@ const state = {
   showLoginPrompt: false,
   apiPanelOpen: false,
   pendingBoardId: '',
+  loadProgress: null,
 };
 
 const subscribers = new Set();
