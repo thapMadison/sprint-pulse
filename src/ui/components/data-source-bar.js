@@ -1,10 +1,9 @@
 import { el } from '../dom.js';
-import { isAuthenticated } from '../../services/auth.js';
+import { isAuthenticated, getWorkerUrl } from '../../services/auth.js';
 import {
   loadDemo, loadFromFile, refreshFromApi, showError, requireLogin,
-  setApiPanelOpen,
+  setApiPanelOpen, loadFromApi, setPendingBoardId, getSavedBoardId,
 } from '../../app/actions.js';
-import { renderApiPanel } from './api-panel.js';
 import { renderProgressOverlay } from './progress-overlay.js';
 
 function formatLastUpdated(date) {
@@ -43,19 +42,48 @@ function hiddenFileInput() {
   return input;
 }
 
+function buildInlineBoardInput({ pendingBoardId, workerUrl }) {
+  const savedBoardId = pendingBoardId || getSavedBoardId();
+
+  const boardIdInput = el('input', {
+    class: 'inline-board-input',
+    placeholder: '123',
+    value: savedBoardId,
+  });
+  boardIdInput.addEventListener('input', () => setPendingBoardId(boardIdInput.value));
+
+  const submit = el('button', { class: 'submit-board', type: 'button' }, ['Load sprints']);
+  submit.addEventListener('click', async () => {
+    const boardId = boardIdInput.value.trim();
+    if (!workerUrl) return;
+    submit.disabled = true;
+    submit.textContent = 'Loading…';
+    try {
+      await loadFromApi(boardId);
+    } finally {
+      submit.disabled = false;
+      submit.textContent = 'Load sprints';
+    }
+  });
+
+  return el('div', {
+    class: 'inline-board-field',
+    'data-tooltip': 'Board ID can be found in your Jira board URL:\n/jira/software/projects/XXX/boards/{boardId}',
+  }, [
+    el('label', { class: 'inline-board-label' }, ['Board ID']),
+    boardIdInput,
+    submit,
+  ]);
+}
+
 export function renderDataSource({
   activeSource, isRefreshing, lastUpdated, apiPanelOpen, pendingBoardId, loadProgress,
 }) {
   const container = el('div', {}, []);
-  const apiHost = el('div', {}, []);
   const fileInput = hiddenFileInput();
+  let workerUrlCache = null;
 
-  function paintApiPanel() {
-    apiHost.innerHTML = '';
-    if (apiPanelOpen) apiHost.appendChild(renderApiPanel({ pendingBoardId }));
-  }
-
-  function paintBar() {
+  function paintBar(inlineBoardEl) {
     const status = statusText({ activeSource, isRefreshing, lastUpdated });
     const authed = isAuthenticated();
 
@@ -104,7 +132,7 @@ export function renderDataSource({
     const progressNode = renderProgressOverlay({ progress: loadProgress });
     const trailing = progressNode
       ? progressNode
-      : el('span', { class: 'ds-status' }, [status]);
+      : inlineBoardEl || el('span', { class: 'ds-status' }, [status]);
 
     return el('div', { class: 'data-source-bar' }, [
       el('span', { class: 'ds-label' }, ['Data source']),
@@ -113,8 +141,24 @@ export function renderDataSource({
     ]);
   }
 
-  container.appendChild(paintBar());
-  container.appendChild(apiHost);
-  paintApiPanel();
+  if (apiPanelOpen && isAuthenticated()) {
+    const loadingBar = paintBar(el('span', { class: 'ds-status' }, ['Loading config...']));
+    container.appendChild(loadingBar);
+
+    (async () => {
+      try {
+        workerUrlCache = workerUrlCache || await getWorkerUrl();
+        const inlineBoardEl = buildInlineBoardInput({ pendingBoardId, workerUrl: workerUrlCache });
+        container.innerHTML = '';
+        container.appendChild(paintBar(inlineBoardEl));
+      } catch (e) {
+        container.innerHTML = '';
+        container.appendChild(paintBar(el('span', { class: 'ds-status err' }, [`Error: ${e.message}`])));
+      }
+    })();
+  } else {
+    container.appendChild(paintBar(null));
+  }
+
   return container;
 }
