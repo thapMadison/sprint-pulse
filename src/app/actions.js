@@ -56,7 +56,20 @@ export async function login() {
 export async function logout() {
   try {
     await signOut();
-    setState({ user: null });
+    localStorage.removeItem(BOARD_ID_KEY);
+    setState({
+      user: null,
+      sprints: DEMO_SPRINTS,
+      activeSprintId: 'sp-24',
+      today: DEMO_TODAY,
+      sourceKey: 'demo',
+      sourceLabel: 'Demo · synced',
+      lastUpdated: null,
+      error: null,
+      isRefreshing: false,
+      apiPanelOpen: false,
+      pendingBoardId: '',
+    });
   } catch (e) {
     setState({ error: `Logout failed: ${e.message}` });
   }
