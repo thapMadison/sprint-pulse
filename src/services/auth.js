@@ -10,15 +10,27 @@ let currentUser = null;
 let authStateListeners = [];
 
 // Cache dynamic imports of Firebase SDK chunks.
-let appModule, authModule, dbModule;
+let appModule, authModule, dbModule, appCheckModule;
 const loadApp = () => (appModule ??= import(`${SDK_BASE}/firebase-app.js`));
 const loadAuth = () => (authModule ??= import(`${SDK_BASE}/firebase-auth.js`));
 const loadDb = () => (dbModule ??= import(`${SDK_BASE}/firebase-database.js`));
+const loadAppCheck = () => (appCheckModule ??= import(`${SDK_BASE}/firebase-app-check.js`));
 
 export async function initFirebase() {
   if (app) return;
-  const [{ initializeApp }, authMod, dbMod] = await Promise.all([loadApp(), loadAuth(), loadDb()]);
+  const [{ initializeApp }, appCheckMod, authMod, dbMod] = await Promise.all([
+    loadApp(), loadAppCheck(), loadAuth(), loadDb(),
+  ]);
   app = initializeApp(firebaseConfig);
+
+  if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+    self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
+  appCheckMod.initializeAppCheck(app, {
+    provider: new appCheckMod.ReCaptchaV3Provider(firebaseConfig.appCheckSiteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+
   auth = authMod.getAuth(app);
   database = dbMod.getDatabase(app);
   authMod.onAuthStateChanged(auth, (user) => {

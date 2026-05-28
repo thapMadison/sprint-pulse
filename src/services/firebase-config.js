@@ -6,6 +6,9 @@ const firebaseConfig = {
   storageBucket: 'dc1-tool.firebasestorage.app',
   messagingSenderId: '27467886077',
   appId: '1:27467886077:web:f1792f18a5f5f5a7d3bd94',
+  // reCAPTCHA v3 site key for App Check (public — safe to commit).
+  // Covers all tool domains registered at https://www.google.com/recaptcha/admin
+  appCheckSiteKey: '6LfwAfMsAAAAALaOyFaWAgofFAjLJEOYkM8BwLwz',
 };
 
 export default firebaseConfig;
