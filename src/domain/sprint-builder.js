@@ -5,6 +5,7 @@
 //     originalEstimate (h), timeSpent (h), remainingEstimate (h),
 //     sprintName, sprintStartDate?, sprintEndDate?, sprintState?, sprintGoal? }
 import { normalizeStatus, extractStatusName } from './status.js';
+import { toLocalDateStr } from './working-days.js';
 
 const USER_COLORS = [
   '#a78bfa', '#22d3ee', '#fb7185', '#84cc16', '#f59e0b',
@@ -40,8 +41,8 @@ function inferDatesAndState(sp, todayDate) {
     const end = new Date(todayDate);
     const start = new Date(todayDate);
     start.setDate(start.getDate() - 14);
-    sp.startDate = sp.startDate || start.toISOString().slice(0, 10);
-    sp.endDate = sp.endDate || end.toISOString().slice(0, 10);
+    sp.startDate = sp.startDate || toLocalDateStr(start);
+    sp.endDate = sp.endDate || toLocalDateStr(end);
   }
   if (!sp.state) {
     const s = new Date(sp.startDate + 'T00:00:00');
@@ -61,6 +62,7 @@ export function buildSprintsFromIssues(rawIssues, today) {
     if (!sprintMap.has(spName)) {
       sprintMap.set(spName, {
         id: spName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+        jiraId: r.sprintId || null,
         name: spName,
         goal: r.sprintGoal || '',
         startDate: r.sprintStartDate || null,
@@ -86,6 +88,7 @@ export function buildSprintsFromIssues(rawIssues, today) {
       originalEstimate: Number(r.originalEstimate) || 0,
       timeSpent: Number(r.timeSpent) || 0,
       remainingEstimate: Number(r.remainingEstimate) || 0,
+      statusChanges: r.statusChanges || [],
     });
   }
 

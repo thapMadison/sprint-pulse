@@ -75,29 +75,38 @@ export default {
       if (sprintMatch) {
         const sprintId = sprintMatch[1];
 
-        // Get sprint info
-        const sprintInfo = await jiraFetch(
-          `${env.JIRA_BASE_URL}/rest/agile/1.0/sprint/${sprintId}`,
-          headers
-        );
+        const [sprintInfo, issuesData] = await Promise.all([
+          jiraFetch(`${env.JIRA_BASE_URL}/rest/agile/1.0/sprint/${sprintId}`, headers),
+          jiraFetch(
+            `${env.JIRA_BASE_URL}/rest/agile/1.0/sprint/${sprintId}/issue?fields=summary,status,assignee,timetracking,issuetype,priority,created&expand=changelog&maxResults=200`,
+            headers
+          ),
+        ]);
 
-        // Get issues
-        const issuesData = await jiraFetch(
-          `${env.JIRA_BASE_URL}/rest/agile/1.0/sprint/${sprintId}/issue?fields=summary,status,assignee,timetracking,issuetype,priority&maxResults=200`,
-          headers
-        );
+        const rawIssues = issuesData.issues || [];
+
+        // Build name → statusCategory map from ALL current statuses of issues in this sprint.
+        // This covers every status currently in use in the workflow without an extra API call.
+        const statusCategoryByName = {};
+        for (const iss of rawIssues) {
+          const st = iss.fields?.status;
+          if (st?.name && st?.statusCategory) {
+            statusCategoryByName[st.name] = st.statusCategory;
+          }
+        }
 
         // Transform to app format
-        const issues = (issuesData.issues || []).map(iss => {
+        const issues = rawIssues.map(iss => {
           const f = iss.fields || {};
           const tt = f.timetracking || {};
           const assignee = f.assignee || {};
+          const status = f.status || { name: 'To Do', statusCategory: { key: 'new' } };
           return {
             key: iss.key,
             summary: f.summary || '',
             type: f.issuetype?.name || 'Task',
             priority: f.priority?.name || 'Medium',
-            status: f.status || { name: 'To Do', statusCategory: { key: 'new' } },
+            status,
             assigneeName: assignee.displayName || 'Unassigned',
             assigneeId: assignee.accountId || '',
             originalEstimate: toHours(tt.originalEstimateSeconds),
@@ -108,6 +117,7 @@ export default {
             sprintEndDate: sprintInfo.endDate?.slice(0, 10) || null,
             sprintState: (sprintInfo.state || '').toLowerCase(),
             sprintGoal: sprintInfo.goal || '',
+            statusChanges: extractStatusChanges(iss.changelog, f.created, status, statusCategoryByName),
           };
         });
 
@@ -120,6 +130,7 @@ export default {
             endDate: sprintInfo.endDate,
             goal: sprintInfo.goal,
           },
+          statusCategoryByName,
           issues,
         }, 200, cors);
       }
@@ -132,6 +143,8 @@ export default {
         );
         const sprints = sprintsData.values || [];
 
+        // No changelog here - it makes the response too large and causes timeouts.
+        // Changelog is fetched on-demand per-sprint via /sprint/:id.
         const allIssues = [];
         for (const sp of sprints) {
           const issuesData = await jiraFetch(
@@ -153,6 +166,7 @@ export default {
               originalEstimate: toHours(tt.originalEstimateSeconds),
               timeSpent: toHours(tt.timeSpentSeconds),
               remainingEstimate: toHours(tt.remainingEstimateSeconds),
+              sprintId: sp.id,
               sprintName: sp.name,
               sprintStartDate: sp.startDate?.slice(0, 10) || null,
               sprintEndDate: sp.endDate?.slice(0, 10) || null,
@@ -184,6 +198,63 @@ async function jiraFetch(url, headers) {
 
 function toHours(sec) {
   return Math.round(((Number(sec) || 0) / 3600) * 100) / 100;
+}
+
+function statusWithCategory(name, map) {
+  const category = name && map ? map[name] : null;
+  return category ? { name, statusCategory: category } : { name };
+}
+
+function extractStatusChanges(changelog, createdDate, initialStatus, statusCategoryByName) {
+  const changes = [];
+
+  // Find the FIRST status change to know what the issue was created as.
+  // If there's any 'status' change in history, the earliest from-status is the initial.
+  let firstChange = null;
+  if (changelog && changelog.histories) {
+    const sorted = [...changelog.histories].sort((a, b) =>
+      (a.created || '').localeCompare(b.created || '')
+    );
+    for (const h of sorted) {
+      for (const item of h.items || []) {
+        if (item.field === 'status') {
+          firstChange = item;
+          break;
+        }
+      }
+      if (firstChange) break;
+    }
+  }
+
+  // Add initial status when issue was created
+  if (createdDate) {
+    const initName = firstChange ? firstChange.fromString : (initialStatus?.name || 'To Do');
+    changes.push({
+      date: createdDate.slice(0, 10),
+      toStatus: statusWithCategory(initName, statusCategoryByName),
+    });
+  }
+
+  if (changelog && changelog.histories) {
+    for (const history of changelog.histories) {
+      const date = history.created?.slice(0, 10);
+      if (!date) continue;
+
+      for (const item of history.items || []) {
+        if (item.field === 'status') {
+          changes.push({
+            date,
+            fromStatus: item.fromString ? statusWithCategory(item.fromString, statusCategoryByName) : null,
+            toStatus: statusWithCategory(item.toString, statusCategoryByName),
+          });
+        }
+      }
+    }
+  }
+
+  // Sort by date
+  changes.sort((a, b) => a.date.localeCompare(b.date));
+  return changes;
 }
 
 function json(data, status, cors) {

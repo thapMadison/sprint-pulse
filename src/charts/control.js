@@ -33,7 +33,7 @@ export function renderControl(series) {
   const bandBot = yScale(Math.max(0, mean - 2 * stdDev));
 
   const yTicks = [0, Math.round(yMax / 2), yMax];
-  const children = renderGridAndAxes(geom, { days, xs, yTicks, yScale });
+  const children = renderGridAndAxes(geom, { days, xs, yTicks, yScale, yLabel: (v) => `${v}d` });
 
   children.push(svg('rect', {
     class: 'control-band area-fade',
@@ -45,19 +45,31 @@ export function renderControl(series) {
   }));
   controlPoints.forEach((p, i) => {
     const isOutlier = Math.abs(p.cycleTime - mean) > 1.5 * stdDev;
+    const tooltip = p.completionDate
+      ? `${p.key}: ${p.cycleTime}d (${p.startDate} → ${p.completionDate})`
+      : `${p.key}: ${p.cycleTime.toFixed(1)}d (no changelog)`;
+
+    // Add jitter to prevent overlapping dots
+    const jitterX = (Math.sin(i * 2.3) * 4);
+    const jitterY = (Math.cos(i * 3.1) * 3);
+
     const c = svg('circle', {
       class: isOutlier ? 'control-pt-outlier' : 'control-pt',
-      cx: xScale(p.dayIdx), cy: yScale(p.cycleTime),
+      cx: xScale(p.dayIdx) + jitterX,
+      cy: yScale(p.cycleTime) + jitterY,
       r: isOutlier ? 6 : 5,
     });
     c.style.animation = `barRise 0.6s ${i * 0.05}s both cubic-bezier(0.2,0.8,0.2,1)`;
+    c.style.cursor = 'pointer';
+    const title = svg('title', {}, [tooltip]);
+    c.appendChild(title);
     children.push(c);
   });
   children.push(svg('text', {
     class: 'axis-text',
     x: W - PAD.r - 4, y: yScale(mean) - 4,
     'text-anchor': 'end', fill: 'var(--cyan)',
-  }, [`μ = ${mean.toFixed(1)}h`]));
+  }, [`μ = ${mean.toFixed(1)}d`]));
 
   return el('div', { class: 'chart-wrap tall' }, [
     svg('svg', {

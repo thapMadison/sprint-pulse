@@ -11,6 +11,7 @@ const CATEGORY_BY_NAME = {
   todo: 'todo',
   open: 'todo',
   backlog: 'todo',
+  'ready to start': 'todo',
   'selected for development': 'todo',
   'in progress': 'inprogress',
   inprogress: 'inprogress',
@@ -24,16 +25,33 @@ const CATEGORY_BY_NAME = {
   completed: 'done',
 };
 
+// Heuristic for custom statuses when no statusCategory is present.
+// Detects common workflow naming patterns.
+function heuristicFromName(name) {
+  const n = name.toLowerCase();
+  if (/(^|\s)(done|closed|resolved|complete|completed|cancel|cancelled|won['’]?t)\b/.test(n)) {
+    return 'done';
+  }
+  if (/(in\s*progress|wip|review|testing|qa|coding|developing|implement|blocked|bug\s*fix|ready\s*for\s*test)/.test(n)) {
+    return 'inprogress';
+  }
+  if (/(to\s*do|todo|backlog|open|new|ready|selected|draft)/.test(n)) {
+    return 'todo';
+  }
+  return null;
+}
+
 export function normalizeStatus(status) {
   if (!status) return 'todo';
   if (typeof status === 'string') {
-    return CATEGORY_BY_NAME[status.toLowerCase()] || 'todo';
+    return CATEGORY_BY_NAME[status.toLowerCase()] || heuristicFromName(status) || 'todo';
   }
   if (status.statusCategory && status.statusCategory.key) {
     return CATEGORY_BY_KEY[status.statusCategory.key] || 'todo';
   }
   if (status.name) {
-    return CATEGORY_BY_NAME[status.name.toLowerCase()] || 'todo';
+    const lower = status.name.toLowerCase();
+    return CATEGORY_BY_NAME[lower] || heuristicFromName(status.name) || 'todo';
   }
   return 'todo';
 }

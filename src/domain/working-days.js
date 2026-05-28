@@ -41,7 +41,11 @@ export function listWorkingDays(startStr, endStr) {
 }
 
 export function todayISO() {
-  const d = new Date();
+  return toLocalDateStr(new Date());
+}
+
+// Format any Date as YYYY-MM-DD in local timezone (avoids UTC conversion issues)
+export function toLocalDateStr(d) {
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
   const dd = String(d.getDate()).padStart(2, '0');

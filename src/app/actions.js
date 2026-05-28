@@ -7,7 +7,9 @@ import { parseFile } from '../data/parsers/index.js';
 import {
   signInWithMicrosoft, signOut, isAuthenticated, getWorkerUrl,
 } from '../services/auth.js';
-import { fetchAllFromWorker } from '../services/jira-api.js';
+import {
+  fetchAllFromWorker, fetchSprintFromWorker, fetchSprintListFromWorker,
+} from '../services/jira-api.js';
 import { setState, setStateSilent, getState } from './state.js';
 
 const BOARD_ID_KEY = 'jira_board_id';
@@ -22,6 +24,59 @@ function pickInitialSprintId(sprints) {
 
 export function setActiveSprint(id) {
   setState({ activeSprintId: id });
+  // Lazy-load changelog for accurate CFD when viewing a Jira-sourced sprint
+  if (getState().sourceKey === 'api') {
+    loadSprintChangelog(id).catch((e) => {
+      console.warn('[CFD] changelog load failed:', e);
+    });
+  }
+}
+
+async function loadSprintChangelog(sprintId) {
+  const s = getState();
+  const sprint = s.sprints.find((sp) => sp.id === sprintId);
+  if (!sprint) return;
+  // Empty array is truthy — check length to detect "actually loaded".
+  if (sprint.issues.length && sprint.issues[0].statusChanges?.length) return;
+
+  const workerUrl = await getWorkerUrl();
+  if (!workerUrl) return;
+  const boardId = localStorage.getItem(BOARD_ID_KEY);
+  if (!boardId) return;
+
+  // Resolve the Jira numeric sprint ID. Old worker /all responses may omit sprintId,
+  // so fall back to looking it up by name from /sprints.
+  let jiraId = sprint.jiraId;
+  if (!jiraId) {
+    try {
+      const list = await fetchSprintListFromWorker(workerUrl, boardId);
+      const found = (list || []).find((sp) => sp.name === sprint.name);
+      jiraId = found?.id;
+    } catch {
+      return;
+    }
+  }
+  if (!jiraId) return;
+
+  const data = await fetchSprintFromWorker(workerUrl, jiraId, boardId);
+  const changesByKey = new Map();
+  for (const iss of data.issues || []) {
+    changesByKey.set(iss.key, iss.statusChanges || []);
+  }
+
+  const latest = getState();
+  const updated = latest.sprints.map((sp) => {
+    if (sp.id !== sprintId) return sp;
+    return {
+      ...sp,
+      jiraId: sp.jiraId || jiraId,
+      issues: sp.issues.map((iss) => ({
+        ...iss,
+        statusChanges: changesByKey.get(iss.key) || [],
+      })),
+    };
+  });
+  setState({ sprints: updated });
 }
 
 export function setApiPanelOpen(open) {
@@ -154,6 +209,9 @@ export async function loadFromApi(boardId) {
     const sprints = buildSprintsFromIssues(raw, getState().today);
     applyLoadedSprints(sprints, `Jira API · Board ${boardId}`, 'api', { apiPanelOpen: false });
     await finishProgress();
+    loadSprintChangelog(getState().activeSprintId).catch((e) => {
+      console.warn('[CFD] changelog load failed:', e);
+    });
     return true;
   } catch (e) {
     setProgress(null);
@@ -187,6 +245,9 @@ export async function refreshFromApi() {
     const sprints = buildSprintsFromIssues(raw, getState().today);
     applyLoadedSprints(sprints, `Jira API · Board ${boardId}`, 'api');
     await finishProgress();
+    loadSprintChangelog(getState().activeSprintId).catch((e) => {
+      console.warn('[CFD] changelog load failed:', e);
+    });
   } catch (e) {
     setProgress(null);
     showError(e.message || String(e));
