@@ -3,14 +3,17 @@
 import { DEMO_SPRINTS, DEMO_TODAY } from '../data/demo.js';
 import { todayISO } from '../domain/working-days.js';
 import { buildSprintsFromIssues } from '../domain/sprint-builder.js';
+import { buildEpics } from '../domain/epic-builder.js';
 import { parseFile } from '../data/parsers/index.js';
 import {
   signInWithMicrosoft, signOut, isAuthenticated, getWorkerUrl,
 } from '../services/auth.js';
 import {
   fetchAllFromWorker, fetchSprintFromWorker, fetchSprintListFromWorker,
+  fetchEpicsFromWorker,
 } from '../services/jira-api.js';
 import { setState, setStateSilent, getState } from './state.js';
+import { DEMO_EPICS } from '../data/demo.js';
 
 const BOARD_ID_KEY = 'jira_board_id';
 
@@ -81,6 +84,153 @@ async function loadSprintChangelog(sprintId) {
 
 export function setApiPanelOpen(open) {
   setState({ apiPanelOpen: open });
+}
+
+export function setView(view) {
+  if (view !== 'sprint' && view !== 'epic') return;
+  setState({ view });
+  if (view === 'epic' && getState().epics.length === 0) {
+    loadEpicsAndChangelogs().catch((e) => {
+      console.warn('[Epic] load failed:', e);
+    });
+  }
+}
+
+export function setActiveEpic(id) {
+  setState({ activeEpicId: id });
+}
+
+export function toggleEpicExpanded(id) {
+  const next = new Set(getState().expandedEpicIds);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  setState({ expandedEpicIds: next });
+}
+
+export function openEpicDetail(id) {
+  setState({ epicDetailId: id });
+}
+
+export function closeEpicDetail() {
+  setState({ epicDetailId: null });
+}
+
+export function setEpicFilter(patch) {
+  setState({ epicFilters: { ...getState().epicFilters, ...patch } });
+}
+
+// Update search text silently then schedule a debounced re-render so the
+// roadmap actually filters while the user keeps typing without losing focus.
+let _epicSearchDebounce = null;
+export function setEpicSearchSilent(value) {
+  const s = getState();
+  setStateSilent({ epicFilters: { ...s.epicFilters, search: value } });
+  if (_epicSearchDebounce) clearTimeout(_epicSearchDebounce);
+  _epicSearchDebounce = setTimeout(() => setState({}), 220);
+}
+
+// Lazy-load: fetch epic metadata + per-sprint changelogs needed to compute
+// accurate epic start/end dates. Runs only when user enters the Epic tab.
+async function loadEpicsAndChangelogs() {
+  const s = getState();
+  const source = s.sourceKey;
+
+  // Demo mode: just build from already-present statusChanges + DEMO_EPICS
+  if (source === 'demo') {
+    const epics = buildEpics(s.sprints, DEMO_EPICS, s.today);
+    setState({
+      rawEpics: DEMO_EPICS,
+      epics,
+      activeEpicId: epics[0]?.id || null,
+      expandedEpicIds: new Set(),
+      epicError: null,
+    });
+    return;
+  }
+
+  // File mode: no API, build from whatever epicKey was parsed. No changelog refine.
+  if (source === 'file') {
+    const epics = buildEpics(s.sprints, [], s.today);
+    setState({
+      rawEpics: [],
+      epics,
+      activeEpicId: epics[0]?.id || null,
+      expandedEpicIds: new Set(),
+      epicError: null,
+    });
+    return;
+  }
+
+  // API mode: fetch /epics + lazy-load changelog for every sprint with tasks.
+  const workerUrl = await getWorkerUrl();
+  if (!workerUrl) {
+    setState({ epicError: 'Worker URL not configured.' });
+    return;
+  }
+  const boardId = localStorage.getItem(BOARD_ID_KEY);
+  if (!boardId) {
+    setState({ epicError: 'Board ID not set.' });
+    return;
+  }
+
+  const sprintsToLoad = s.sprints.filter(
+    (sp) => sp.issues.length && (!sp.issues[0].statusChanges || !sp.issues[0].statusChanges.length)
+  );
+  const totalSteps = sprintsToLoad.length + 1; // +1 for /epics
+  let step = 0;
+  const updateProgress = (label) => {
+    step++;
+    setState({
+      epicLoadProgress: {
+        step, total: totalSteps, label,
+        percent: Math.round((step / totalSteps) * 100),
+      },
+    });
+  };
+
+  try {
+    setState({
+      epicLoadProgress: { step: 0, total: totalSteps, label: 'Fetching epics…', percent: 0 },
+      epicError: null,
+    });
+
+    // 1. Fetch epic metadata
+    let rawEpics = [];
+    try {
+      rawEpics = await fetchEpicsFromWorker(workerUrl, boardId);
+    } catch (e) {
+      // Non-fatal: continue with empty rawEpics, fall back to epicKey as name
+      console.warn('[Epic] /epics fetch failed, falling back to derived names:', e);
+    }
+    updateProgress('Epics loaded');
+
+    // 2. Lazy-load changelog per sprint (sequential to avoid worker rate limits)
+    for (const sp of sprintsToLoad) {
+      try {
+        await loadSprintChangelog(sp.id);
+      } catch (e) {
+        console.warn(`[Epic] changelog load failed for ${sp.name}:`, e);
+      }
+      updateProgress(`Loaded ${sp.name}`);
+    }
+
+    // 3. Build epics with the now-enriched sprints
+    const latest = getState();
+    const epics = buildEpics(latest.sprints, rawEpics, latest.today);
+    setState({
+      rawEpics,
+      epics,
+      activeEpicId: epics[0]?.id || null,
+      expandedEpicIds: new Set(),
+      epicLoadProgress: null,
+      epicError: null,
+    });
+  } catch (e) {
+    setState({
+      epicLoadProgress: null,
+      epicError: e.message || String(e),
+    });
+  }
 }
 
 export function setPendingBoardId(v) {
@@ -155,6 +305,15 @@ export async function logout() {
       apiPanelOpen: false,
       pendingBoardId: '',
       loadProgress: null,
+      view: 'sprint',
+      epics: [],
+      rawEpics: [],
+      activeEpicId: null,
+      epicLoadProgress: null,
+      epicError: null,
+      expandedEpicIds: new Set(),
+      epicDetailId: null,
+      epicFilters: { status: 'all', sprintId: 'all', search: '' },
     });
   } catch (e) {
     setState({ error: `Logout failed: ${e.message}` });
@@ -172,6 +331,11 @@ export function loadDemo() {
     error: null,
     isRefreshing: false,
     apiPanelOpen: false,
+    epics: [],
+    rawEpics: [],
+    activeEpicId: null,
+    epicLoadProgress: null,
+    epicError: null,
   });
 }
 
@@ -264,6 +428,15 @@ function applyLoadedSprints(sprints, sourceLabel, sourceKey, extra = {}) {
     lastUpdated: new Date(),
     error: null,
     isRefreshing: false,
+    // Reset epic-derived state — will rebuild next time user enters Epic tab
+    epics: [],
+    rawEpics: [],
+    activeEpicId: null,
+    epicLoadProgress: null,
+    epicError: null,
+    expandedEpicIds: new Set(),
+    epicDetailId: null,
+    epicFilters: { status: 'all', sprintId: 'all', search: '' },
     ...extra,
   });
 }

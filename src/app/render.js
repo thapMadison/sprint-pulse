@@ -8,15 +8,23 @@ import { renderDataSource } from '../ui/components/data-source-bar.js';
 import { renderSprintFilter } from '../ui/components/sprint-filter.js';
 import { renderSprintHero } from '../ui/components/sprint-hero.js';
 import { renderWorkloadTable } from '../ui/components/workload-table.js';
+import { renderViewTabs } from '../ui/components/view-tabs.js';
+import { renderEpicFilterBar } from '../ui/components/epic-filter-bar.js';
+import { renderEpicDetailPanel } from '../ui/components/epic-detail-panel.js';
 
 import { renderBurndown } from '../charts/burndown.js';
 import { renderBurnup } from '../charts/burnup.js';
 import { renderCFD } from '../charts/cfd.js';
 import { renderControl } from '../charts/control.js';
 import { renderDonut } from '../charts/donut.js';
+import { renderEpicRoadmap } from '../charts/epic-roadmap.js';
 
 import { getState, activeSprint } from './state.js';
-import { login, logout, setActiveSprint } from './actions.js';
+import {
+  login, logout, setActiveSprint, setView,
+  toggleEpicExpanded, openEpicDetail, closeEpicDetail,
+  setEpicFilter, setEpicSearchSilent,
+} from './actions.js';
 
 const CHART_TOOLTIPS = {
   burndown: {
@@ -210,6 +218,78 @@ function renderStatusCard(sprint) {
   ]);
 }
 
+function renderEpicLoadingBanner(progress) {
+  const pct = Math.max(0, Math.min(100, progress.percent || 0));
+  return el('div', { class: 'banner info epic-load-banner' }, [
+    el('div', { class: 'epic-load-row' }, [
+      el('span', { class: 'spinner-mini' }),
+      el('span', { class: 'epic-load-label' }, [progress.label || 'Loading epic data…']),
+      el('span', { class: 'epic-load-step' }, [`${progress.step}/${progress.total}`]),
+    ]),
+    el('div', { class: 'epic-load-track' }, [
+      el('span', { style: { width: `${pct}%` } }),
+    ]),
+  ]);
+}
+
+function renderEpicView() {
+  const s = getState();
+  const children = [];
+
+  if (s.epicLoadProgress) {
+    children.push(renderEpicLoadingBanner(s.epicLoadProgress));
+  }
+  if (s.epicError) {
+    children.push(el('div', { class: 'banner error' }, [`Epic data: ${s.epicError}`]));
+  }
+
+  const visibleEpics = s.epics.filter((e) => {
+    if (s.epicFilters.status !== 'all' && e.status !== s.epicFilters.status) return false;
+    if (s.epicFilters.sprintId !== 'all' && !e.sprintIds.includes(s.epicFilters.sprintId)) return false;
+    const q = (s.epicFilters.search || '').toLowerCase().trim();
+    if (q && !`${e.key} ${e.name}`.toLowerCase().includes(q)) return false;
+    return true;
+  }).length;
+
+  children.push(renderEpicFilterBar({
+    filters: s.epicFilters,
+    sprints: s.sprints,
+    totalEpics: s.epics.length,
+    visibleEpics,
+    onStatusChange: (v) => setEpicFilter({ status: v }),
+    onSprintChange: (v) => setEpicFilter({ sprintId: v }),
+    onSearchInput: (v) => setEpicSearchSilent(v),
+    onClearAll: () => setEpicFilter({ status: 'all', sprintId: 'all', search: '' }),
+  }));
+
+  children.push(renderEpicRoadmap({
+    epics: s.epics,
+    sprints: s.sprints,
+    today: s.today,
+    expandedIds: s.expandedEpicIds,
+    filters: s.epicFilters,
+    onToggleExpand: toggleEpicExpanded,
+    onOpenDetail: openEpicDetail,
+  }));
+
+  const detailEpic = s.epicDetailId
+    ? s.epics.find((e) => e.id === s.epicDetailId)
+    : null;
+  if (detailEpic) {
+    children.push(renderEpicDetailPanel({
+      epic: detailEpic, today: s.today, onClose: closeEpicDetail,
+    }));
+  }
+
+  if (!s.epics.length && !s.epicLoadProgress) {
+    children.push(el('div', { class: 'banner info' }, [
+      'No epics yet. Once data loads they will appear in the roadmap above.',
+    ]));
+  }
+
+  return children;
+}
+
 function chartCard(title, body, tooltipKey) {
   const titleChildren = [el('span', {}, [title])];
   const tooltip = renderChartTooltip(tooltipKey);
@@ -260,31 +340,37 @@ export function render() {
     return;
   }
 
-  const sprint = activeSprint();
-  const series = generateDailySeries(sprint, s.today);
-
   const children = [topbar(), dataSourceBar()];
+  children.push(renderViewTabs({ active: s.view, onChange: setView }));
   if (s.error) children.push(el('div', { class: 'banner error' }, [s.error]));
 
-  children.push(renderSprintFilter({
-    sprints: s.sprints,
-    activeId: s.activeSprintId,
-    onChange: setActiveSprint,
-  }));
+  if (s.view === 'epic') {
+    children.push(...renderEpicView());
+  } else {
+    const sprint = activeSprint();
+    const series = generateDailySeries(sprint, s.today);
 
-  const hero = renderSprintHero({ sprint, today: s.today });
-  hero.appendChild(renderStatusCard(sprint));
-  children.push(hero);
+    children.push(renderSprintFilter({
+      sprints: s.sprints,
+      activeId: s.activeSprintId,
+      onChange: setActiveSprint,
+    }));
 
-  children.push(el('div', { class: 'row cols-2' }, [
-    chartCard('Burndown', renderBurndown(series), 'burndown'),
-    chartCard('Cumulative Flow', renderCFD(series), 'cfd'),
-  ]));
-  children.push(el('div', { class: 'row cols-2' }, [
-    chartCard('Burnup', renderBurnup(series), 'burnup'),
-    chartCard('Control Chart', renderControl(series), 'control'),
-  ]));
-  children.push(el('div', { class: 'row' }, [renderWorkloadTable({ sprint })]));
+    const hero = renderSprintHero({ sprint, today: s.today });
+    hero.appendChild(renderStatusCard(sprint));
+    children.push(hero);
+
+    children.push(el('div', { class: 'row cols-2' }, [
+      chartCard('Burndown', renderBurndown(series), 'burndown'),
+      chartCard('Cumulative Flow', renderCFD(series), 'cfd'),
+    ]));
+    children.push(el('div', { class: 'row cols-2' }, [
+      chartCard('Burnup', renderBurnup(series), 'burnup'),
+      chartCard('Control Chart', renderControl(series), 'control'),
+    ]));
+    children.push(el('div', { class: 'row' }, [renderWorkloadTable({ sprint })]));
+  }
+
   children.push(el('footer', { class: 'footer' }, [
     el('span', {}, ['Sprint Pulse · Jira Analytics']),
     el('span', { style: { textTransform: 'none' } }, ['Idea by Phuong Phan']),

@@ -1,0 +1,197 @@
+// Group all sprint issues by their epic parent, derive Epic-level metadata:
+// status, progress, start/end dates from changelog when available.
+//
+// Inputs:
+//   sprints: built sprints (from buildSprintsFromIssues), each issue may have
+//            epicKey, epicName, statusChanges (lazy-loaded changelog).
+//   rawEpics: optional [{ key, name, summary, status }] from worker /epics.
+//   today: ISO date string for "in-progress until today".
+//
+// Output: Array of Epic objects (see schema below).
+
+import { normalizeStatus } from './status.js';
+
+export const NO_EPIC_ID = '__NO_EPIC__';
+
+function categoryKey(toStatus) {
+  if (!toStatus) return null;
+  if (toStatus.statusCategory && toStatus.statusCategory.key) {
+    return toStatus.statusCategory.key;
+  }
+  // Fallback: normalize by name
+  const norm = normalizeStatus(toStatus);
+  if (norm === 'done') return 'done';
+  if (norm === 'inprogress') return 'indeterminate';
+  return 'new';
+}
+
+// First date the issue left "To Do" (entered any non-new status).
+// Returns null if no changelog, or the issue never started.
+function firstStartedDate(task) {
+  if (!task.statusChanges || !task.statusChanges.length) return null;
+  for (const ch of task.statusChanges) {
+    const cat = categoryKey(ch.toStatus);
+    if (cat && cat !== 'new') return ch.date;
+  }
+  return null;
+}
+
+// Last date the issue entered "Done" category. Null if never reached done.
+function lastDoneDate(task) {
+  if (!task.statusChanges || !task.statusChanges.length) return null;
+  let last = null;
+  for (const ch of task.statusChanges) {
+    if (categoryKey(ch.toStatus) === 'done') last = ch.date;
+  }
+  return last;
+}
+
+// Fallback when no changelog: derive from current status + sprint dates.
+function fallbackStarted(task, sprint) {
+  if (task.status === 'todo') return null;
+  return sprint?.startDate || null;
+}
+function fallbackDone(task, sprint) {
+  if (task.status !== 'done') return null;
+  return sprint?.endDate || null;
+}
+
+function minDate(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  return a < b ? a : b;
+}
+function maxDate(a, b) {
+  if (!a) return b;
+  if (!b) return a;
+  return a > b ? a : b;
+}
+
+function deriveEpicStatus(tasks) {
+  if (!tasks.length) return 'todo';
+  const allDone = tasks.every((t) => t.status === 'done');
+  if (allDone) return 'done';
+  const anyStarted = tasks.some((t) => t.status !== 'todo');
+  return anyStarted ? 'inprogress' : 'todo';
+}
+
+export function buildEpics(sprints, rawEpics, today) {
+  // Index epic metadata by key for fast lookup
+  const epicMetaByKey = new Map();
+  for (const e of rawEpics || []) {
+    if (e.key) epicMetaByKey.set(e.key, e);
+  }
+
+  // Build {epicKey → tasksWithSprintRef}
+  const taskGroups = new Map();
+  for (const sp of sprints) {
+    for (const iss of sp.issues) {
+      const key = iss.epicKey || NO_EPIC_ID;
+      if (!taskGroups.has(key)) taskGroups.set(key, []);
+      taskGroups.get(key).push({
+        ...iss,
+        sprintId: sp.id,
+        sprintName: sp.name,
+        sprintStartDate: sp.startDate,
+        sprintEndDate: sp.endDate,
+        // Derived per-task dates
+        startedDate: firstStartedDate(iss) || fallbackStarted(iss, sp),
+        doneDate: lastDoneDate(iss) || fallbackDone(iss, sp),
+      });
+    }
+  }
+
+  // Also include epics from rawEpics that have no tasks in loaded sprints
+  for (const meta of epicMetaByKey.values()) {
+    if (!taskGroups.has(meta.key)) taskGroups.set(meta.key, []);
+  }
+
+  const epics = [];
+  for (const [key, tasks] of taskGroups.entries()) {
+    const isNoEpic = key === NO_EPIC_ID;
+    const meta = epicMetaByKey.get(key);
+
+    // Fallback name from any task that carried epicName
+    const taskWithName = tasks.find((t) => t.epicName);
+    const name = isNoEpic
+      ? 'No Epic'
+      : (meta?.name || taskWithName?.epicName || key);
+
+    const summary = isNoEpic
+      ? 'Tasks without an Epic parent'
+      : (meta?.summary || name);
+
+    const status = deriveEpicStatus(tasks);
+    const statusName = isNoEpic
+      ? ''
+      : (meta?.status?.name ||
+         (status === 'done' ? 'Done' : status === 'inprogress' ? 'In Progress' : 'To Do'));
+
+    // Aggregate progress
+    const totalIssues = tasks.length;
+    const doneIssues = tasks.filter((t) => t.status === 'done').length;
+    const totalHours = tasks.reduce((s, t) => s + (t.originalEstimate || 0), 0);
+    const doneHours = tasks
+      .filter((t) => t.status === 'done')
+      .reduce((s, t) => s + (t.originalEstimate || 0), 0);
+    const percent = totalHours > 0
+      ? Math.round((doneHours / totalHours) * 100)
+      : totalIssues > 0
+        ? Math.round((doneIssues / totalIssues) * 100)
+        : 0;
+
+    // Aggregate dates
+    let startDate = null;
+    let endDate = null;
+    for (const t of tasks) {
+      if (t.startedDate) startDate = minDate(startDate, t.startedDate);
+      if (t.doneDate) endDate = maxDate(endDate, t.doneDate);
+    }
+    // endDate is only "real" when ALL tasks are done; otherwise epic is in progress
+    if (status !== 'done') endDate = null;
+
+    const sprintIds = Array.from(new Set(tasks.map((t) => t.sprintId).filter(Boolean)));
+
+    epics.push({
+      id: isNoEpic ? NO_EPIC_ID : key,
+      key,
+      name,
+      summary,
+      status,
+      statusName,
+      tasks,
+      sprintIds,
+      startDate,
+      endDate,
+      today,
+      progress: {
+        totalIssues, doneIssues,
+        totalHours, doneHours,
+        percent,
+        counts: {
+          todo: tasks.filter((t) => t.status === 'todo').length,
+          inprogress: tasks.filter((t) => t.status === 'inprogress').length,
+          done: doneIssues,
+        },
+        hours: {
+          todo: tasks.filter((t) => t.status === 'todo').reduce((s, t) => s + (t.originalEstimate || 0), 0),
+          inprogress: tasks.filter((t) => t.status === 'inprogress').reduce((s, t) => s + (t.originalEstimate || 0), 0),
+          done: doneHours,
+        },
+      },
+      isNoEpic,
+    });
+  }
+
+  // Sort: real epics first (in-progress → not started → done), No Epic last
+  const STATE_ORDER = { inprogress: 0, todo: 1, done: 2 };
+  epics.sort((a, b) => {
+    if (a.isNoEpic !== b.isNoEpic) return a.isNoEpic ? 1 : -1;
+    const sa = STATE_ORDER[a.status] ?? 3;
+    const sb = STATE_ORDER[b.status] ?? 3;
+    if (sa !== sb) return sa - sb;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  return epics;
+}

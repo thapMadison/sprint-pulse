@@ -1017,3 +1017,1040 @@ html.theme-light {
   0%, 100% { transform: scale(1); }
   50%      { transform: scale(1.25); }
 }
+
+/* ============================================================
+   Epic view: tabs, list, hero, tasks table, Gantt timeline
+   ============================================================ */
+
+/* --- View tabs (Sprint | Epic) --- */
+.view-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  backdrop-filter: blur(20px);
+  margin-bottom: 14px;
+}
+.view-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+.view-tab:hover { color: var(--ink-2); background: oklch(1 0 0 / 0.04); }
+.view-tab.active {
+  background: linear-gradient(135deg, oklch(0.7 0.18 295 / 0.18), oklch(0.82 0.13 200 / 0.12));
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px oklch(0.7 0.18 295 / 0.35);
+}
+.theme-light .view-tab:hover { background: oklch(0.2 0.01 270 / 0.04); }
+
+/* --- Epic loading banner --- */
+.epic-load-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: oklch(0.7 0.18 295 / 0.08);
+  border-color: oklch(0.7 0.18 295 / 0.3);
+}
+.epic-load-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.epic-load-label { flex: 1; }
+.epic-load-step { color: var(--ink-3); }
+.epic-load-track {
+  position: relative;
+  width: 100%;
+  height: 4px;
+  background: oklch(1 0 0 / 0.08);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.epic-load-track span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--violet), var(--cyan));
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+.spinner-mini {
+  width: 12px;
+  height: 12px;
+  border: 2px solid oklch(0.7 0.18 295 / 0.25);
+  border-top-color: var(--violet);
+  border-radius: 50%;
+  animation: spinner-rot 0.9s linear infinite;
+}
+@keyframes spinner-rot { to { transform: rotate(360deg); } }
+
+/* --- Epic list (grid of cards) --- */
+.epic-list-card { margin-bottom: 16px; }
+.epic-list-empty { padding: 32px; text-align: center; }
+.epic-empty-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink-2);
+  margin-bottom: 6px;
+}
+.epic-empty-body { color: var(--ink-3); margin: 0; }
+
+.epic-list-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.epic-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: oklch(1 0 0 / 0.025);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  font-family: inherit;
+  color: inherit;
+}
+.epic-card:hover {
+  background: oklch(1 0 0 / 0.05);
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+.theme-light .epic-card { background: oklch(0.2 0.01 270 / 0.025); }
+.theme-light .epic-card:hover { background: oklch(0.2 0.01 270 / 0.05); }
+.epic-card.active {
+  background: linear-gradient(135deg, oklch(0.7 0.18 295 / 0.12), oklch(0.82 0.13 200 / 0.08));
+  border-color: oklch(0.7 0.18 295 / 0.45);
+  box-shadow: 0 4px 16px -6px oklch(0.7 0.18 295 / 0.4);
+}
+.epic-card.no-epic {
+  opacity: 0.75;
+  border-style: dashed;
+}
+.epic-card.no-epic:hover { opacity: 1; }
+
+.epic-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.epic-key {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--ink-3);
+}
+.epic-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
+.epic-status-dot.inprogress {
+  background: var(--amber);
+  box-shadow: 0 0 0 3px oklch(0.82 0.15 75 / 0.2);
+  animation: progress-pulse 1.6s ease-in-out infinite;
+}
+.epic-status-dot.done { background: var(--lime); }
+.epic-status-dot.todo { background: var(--ink-3); }
+.epic-status-pill {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: oklch(0.5 0.01 270 / 0.18);
+  color: var(--ink-2);
+}
+.epic-status-pill.inprogress {
+  background: oklch(0.82 0.15 75 / 0.18);
+  color: var(--amber);
+}
+.epic-status-pill.done {
+  background: oklch(0.84 0.18 130 / 0.18);
+  color: var(--lime);
+}
+.epic-card-name {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.3;
+}
+.epic-card-dates {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.epic-progress-mini {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.epic-progress-track {
+  display: flex;
+  height: 6px;
+  background: oklch(1 0 0 / 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.theme-light .epic-progress-track { background: oklch(0.2 0.01 270 / 0.08); }
+.epic-progress-track .seg-done { background: var(--lime); }
+.epic-progress-track .seg-inprog { background: var(--amber); }
+.epic-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.epic-progress-meta .pct { color: var(--ink-2); font-weight: 600; }
+
+/* --- Epic hero --- */
+.epic-hero { margin-top: 4px; }
+.epic-hero-card .name {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.epic-hero-key {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink-3);
+  letter-spacing: 0.06em;
+}
+.epic-hero-name { color: var(--ink); }
+.epic-hero-summary {
+  margin: 8px 0 0;
+  color: var(--ink-3);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.epic-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  background: oklch(0.5 0.01 270 / 0.18);
+  color: var(--ink-2);
+  border-radius: 999px;
+}
+.epic-hero-badge.inprogress {
+  background: oklch(0.82 0.15 75 / 0.18);
+  color: var(--amber);
+}
+.epic-hero-badge.inprogress .pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 0 3px oklch(0.82 0.15 75 / 0.25);
+  animation: progress-pulse 1.4s ease-in-out infinite;
+}
+.epic-hero-badge.done {
+  background: oklch(0.84 0.18 130 / 0.18);
+  color: var(--lime);
+}
+.epic-hero-badge.todo {
+  background: oklch(0.5 0.01 270 / 0.15);
+  color: var(--ink-2);
+}
+.epic-hero-badge .pulse { display: inline-block; width: 6px; height: 6px; }
+
+/* --- Epic tasks table additions --- */
+.epic-tasks-table .epic-task-summary {
+  color: var(--ink-2);
+  font-weight: 400;
+  max-width: 380px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mono-key {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-2);
+  letter-spacing: 0.04em;
+}
+.mono-cell {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.sprint-chip {
+  display: inline-block;
+  padding: 3px 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  background: oklch(0.7 0.18 295 / 0.12);
+  color: var(--ink-2);
+  border-radius: 6px;
+}
+.user-cell-mini {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.avatar-mini {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* --- Epic Gantt chart --- */
+.epic-gantt-card { padding-bottom: 12px; }
+.gantt-scroll {
+  width: 100%;
+  overflow-x: auto;
+  padding: 4px 0 8px;
+}
+.gantt-axis-text {
+  font-family: var(--font-mono);
+}
+.gantt-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.gantt-legend .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.gantt-legend .legend-sw {
+  width: 16px;
+  height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+}
+.gantt-legend .legend-sw.done { background: var(--lime); }
+.gantt-legend .legend-sw.inprog { background: var(--amber); }
+.gantt-legend .legend-sw.ongoing-pattern {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--amber) 0px,
+    var(--amber) 3px,
+    oklch(0.82 0.15 75 / 0.2) 3px,
+    oklch(0.82 0.15 75 / 0.2) 6px
+  );
+}
+.gantt-legend .legend-sw.today-line {
+  background: transparent;
+  border-left: 2px dashed var(--coral);
+  width: 4px;
+  height: 14px;
+}
+
+/* ============================================================
+   Portfolio Roadmap
+   ============================================================ */
+.roadmap-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  margin-bottom: 12px;
+}
+.roadmap-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.roadmap-filter-search-wrap { flex: 1; min-width: 200px; }
+.roadmap-filter-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.roadmap-filter-chips {
+  display: flex;
+  gap: 4px;
+  padding: 2px;
+  background: oklch(1 0 0 / 0.04);
+  border-radius: 8px;
+}
+.theme-light .roadmap-filter-chips { background: oklch(0.2 0.01 270 / 0.05); }
+.roadmap-filter-chip {
+  border: 0;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 6px 12px;
+  color: var(--ink-3);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.roadmap-filter-chip:hover { color: var(--ink-2); }
+.roadmap-filter-chip.active {
+  background: oklch(0.7 0.18 295 / 0.18);
+  color: var(--ink);
+  font-weight: 600;
+}
+.roadmap-filter-select,
+.roadmap-filter-search {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 7px 10px;
+  background: oklch(1 0 0 / 0.04);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--ink);
+  outline: none;
+}
+.theme-light .roadmap-filter-select,
+.theme-light .roadmap-filter-search { background: oklch(0.2 0.01 270 / 0.04); }
+.roadmap-filter-search { width: 100%; }
+.roadmap-filter-select:focus,
+.roadmap-filter-search:focus { border-color: oklch(0.7 0.18 295 / 0.6); }
+.roadmap-filter-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.roadmap-filter-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.roadmap-filter-clear {
+  border: 0;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--coral);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.roadmap-filter-clear:hover { text-decoration: underline; }
+
+/* ===== Roadmap card ===== */
+.roadmap-card { padding-bottom: 10px; }
+.roadmap-empty {
+  padding: 32px;
+  text-align: center;
+  color: var(--ink-3);
+}
+.roadmap-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  margin-top: 8px;
+  /* Promote to its own compositor layer so horizontal scroll doesn't repaint
+     the surrounding card (backdrop-filter etc.). */
+  will-change: scroll-position;
+  contain: paint;
+}
+.roadmap-track-inner {
+  position: relative;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+}
+/* Axis is the only overlay that lives inside the CSS grid (so it stretches
+   from column-2 left edge to the end of the timeline naturally). */
+.roadmap-track-inner > .roadmap-axis {
+  grid-column: 2 / 3;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+/* Background + Today layers are NOT grid items — they're absolutely positioned
+   so they can cover the right-track area independently of row heights. */
+.roadmap-bg-overlay,
+.roadmap-today-layer {
+  position: absolute;
+  top: 30px;        /* matches axis height */
+  left: 280px;      /* skip the sticky left meta column */
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  contain: layout paint;
+}
+.roadmap-bg-overlay { z-index: 0; }
+.roadmap-today-layer { z-index: 3; }  /* above bars (z:2), below sticky-left (z:4) */
+
+/* ===== Date axis: single-tier month + year bands ===== */
+.roadmap-axis {
+  height: 30px;
+  background: var(--bg-card, oklch(0.16 0.01 270));
+  border-bottom: 1px solid var(--border-strong);
+}
+.theme-light .roadmap-axis { background: oklch(0.99 0 0); }
+.roadmap-axis-months {
+  position: relative;
+  height: 30px;
+  background: oklch(0.5 0.01 270 / 0.06);
+}
+.theme-light .roadmap-axis-months { background: oklch(0.2 0.01 270 / 0.03); }
+.roadmap-month-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  border-left: 1px solid var(--border);
+  overflow: hidden;
+}
+.roadmap-month-band:first-child { border-left: 0; }
+.roadmap-month-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* ===== Sprint background bands with labels ===== */
+.roadmap-sprint-bands {
+  position: absolute;
+  inset: 0;
+}
+.roadmap-sprint-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed oklch(0.6 0.01 270 / 0.5);
+}
+.roadmap-sprint-band.band-a { background: oklch(0.7 0.12 295 / 0.05); }
+.roadmap-sprint-band.band-b { background: oklch(0.7 0.12 200 / 0.05); }
+.roadmap-sprint-band.band-c { background: oklch(0.7 0.12 130 / 0.05); }
+.roadmap-sprint-band.active {
+  background: oklch(0.82 0.15 75 / 0.10);
+  border-left: 2px solid var(--amber);
+  box-shadow: inset -2px 0 0 0 var(--amber);
+}
+.roadmap-sprint-band.future {
+  background: oklch(0.5 0.01 270 / 0.04);
+}
+.roadmap-sprint-band-label {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--ink-2);
+  text-transform: uppercase;
+  white-space: nowrap;
+  background: var(--bg-card, oklch(0.16 0.01 270));
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  pointer-events: none;
+}
+.theme-light .roadmap-sprint-band-label { background: oklch(0.99 0 0); }
+.roadmap-sprint-band.active .roadmap-sprint-band-label {
+  color: var(--amber);
+  border-color: oklch(0.82 0.15 75 / 0.4);
+}
+
+/* Today vertical marker */
+.roadmap-today {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 2px dashed var(--coral);
+  pointer-events: none;
+}
+.roadmap-today-label {
+  position: absolute;
+  top: 6px;
+  left: 4px;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: oklch(1 0 0);
+  background: var(--coral);
+  padding: 2px 6px;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px oklch(0 0 0 / 0.3);
+}
+
+/* Rows */
+.roadmap-rows {
+  grid-column: 1 / 3;
+  display: contents;
+}
+.roadmap-row {
+  display: contents;
+}
+.roadmap-row-left,
+.roadmap-row-right {
+  position: relative;
+  z-index: 2;
+  border-bottom: 1px solid var(--border);
+}
+.roadmap-row-left {
+  position: sticky;
+  left: 0;
+  background: var(--bg-card, oklch(0.16 0.01 270));
+  border-right: 1px solid var(--border);
+  padding: 8px 12px;
+  z-index: 4;  /* above today-layer (z:3) so the marker tucks behind it */
+  contain: layout paint;
+}
+.theme-light .roadmap-row-left { background: oklch(0.99 0 0); }
+.roadmap-row-right {
+  position: relative;
+}
+
+/* Epic row styling */
+.epic-row .roadmap-row-left,
+.epic-row .roadmap-row-right {
+  min-height: 56px;
+}
+.epic-left {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.roadmap-chevron-btn {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px 4px;
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  margin-top: 2px;
+}
+.roadmap-chevron-btn:hover { color: var(--ink); }
+.roadmap-chevron {
+  display: inline-block;
+  font-size: 10px;
+  transition: transform 0.18s ease;
+}
+.roadmap-chevron.open { transform: rotate(90deg); }
+.roadmap-meta { flex: 1; min-width: 0; }
+.roadmap-meta-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+.roadmap-key {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+  letter-spacing: 0.06em;
+}
+.roadmap-name-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font: 600 13px var(--font-display);
+  color: var(--ink);
+  cursor: pointer;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 4px;
+}
+.roadmap-name-btn:hover {
+  color: oklch(0.78 0.16 295);
+  text-decoration: underline;
+}
+.roadmap-status-pill {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: oklch(0.5 0.01 270 / 0.18);
+  color: var(--ink-2);
+}
+.roadmap-status-pill.inprogress {
+  background: oklch(0.82 0.15 75 / 0.18);
+  color: var(--amber);
+}
+.roadmap-status-pill.done {
+  background: oklch(0.84 0.18 130 / 0.18);
+  color: var(--lime);
+}
+.roadmap-status-pill.loose {
+  background: oklch(0.5 0.01 270 / 0.12);
+  color: var(--ink-3);
+  border: 1px dashed var(--border-strong);
+}
+
+/* Mini progress: thin segmented bar + percent on the right of count */
+.roadmap-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 2px;
+}
+.roadmap-progress-track {
+  display: flex;
+  height: 6px;
+  background: oklch(1 0 0 / 0.05);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid oklch(1 0 0 / 0.04);
+}
+.theme-light .roadmap-progress-track {
+  background: oklch(0.2 0.01 270 / 0.06);
+  border-color: oklch(0.2 0.01 270 / 0.05);
+}
+.roadmap-progress-track .seg-done { background: var(--lime); }
+.roadmap-progress-track .seg-inprog { background: var(--amber); }
+.roadmap-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+}
+.roadmap-progress-meta .pct {
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 11px;
+}
+
+/* ===== Bars in the right track ===== */
+.roadmap-row-right { padding: 10px 0; }
+.roadmap-bar {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  border-radius: 5px;
+  cursor: default;
+  z-index: 2;
+}
+
+/* Epic bar: a muted track tinted by status, with a solid progress fill inside.
+   The percent label sits at the right edge, on top of fill/track. */
+.roadmap-bar.epic {
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  overflow: hidden;
+  border: 1px solid transparent;
+  background: oklch(0.5 0.01 270 / 0.15);
+}
+.theme-light .roadmap-bar.epic { background: oklch(0.2 0.01 270 / 0.08); }
+.roadmap-bar.epic.done {
+  background: oklch(0.84 0.18 130 / 0.18);
+  border-color: oklch(0.84 0.18 130 / 0.45);
+}
+.roadmap-bar.epic.inprogress {
+  background: oklch(0.82 0.15 75 / 0.15);
+  border-color: oklch(0.82 0.15 75 / 0.45);
+}
+.roadmap-bar.epic.todo {
+  background: oklch(0.5 0.01 270 / 0.12);
+  border: 1px dashed oklch(0.5 0.01 270 / 0.45);
+}
+.roadmap-bar.epic.ongoing {
+  border-right: 2px dashed oklch(0.82 0.15 75 / 0.8);
+  border-radius: 5px 2px 2px 5px;
+}
+/* The fill always shows "% of tasks done" — solid lime regardless of the
+   epic's overall status. That way an in-progress epic visualizes its progress
+   against the amber-tinted track (see how much green vs amber remains). */
+.roadmap-bar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--lime);
+  z-index: 0;
+  border-radius: inherit;
+  opacity: 0.85;
+}
+.roadmap-bar.epic.todo .roadmap-bar-fill { display: none; }
+.roadmap-bar-pct {
+  position: relative;
+  z-index: 1;
+  padding: 0 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+.theme-light .roadmap-bar-pct { color: oklch(0.15 0.02 270); }
+.roadmap-bar.task {
+  height: 12px;
+  font-size: 0;
+}
+.roadmap-bar.task.done { background: var(--lime); opacity: 0.85; }
+.roadmap-bar.task.inprogress { background: var(--amber); opacity: 0.9; }
+.roadmap-bar.task.todo { background: oklch(0.5 0.01 270 / 0.5); }
+.roadmap-bar.task.ongoing {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--amber) 0 3px,
+    oklch(0.82 0.15 75 / 0.3) 3px 6px
+  );
+}
+.roadmap-bar-label {
+  padding: 0 6px;
+  white-space: nowrap;
+}
+.roadmap-bar-empty {
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  transform: translateY(-50%);
+  font: italic 500 11px var(--font-mono);
+  color: var(--ink-3);
+}
+.roadmap-task-dot {
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ink-3);
+  transform: translateY(-50%);
+  opacity: 0.6;
+}
+
+/* Task row */
+.task-row .roadmap-row-left,
+.task-row .roadmap-row-right {
+  min-height: 36px;
+}
+/* Left column must stay OPAQUE — it's position: sticky and overlays the bars
+   when the right track is scrolled. A transparent bg lets bars bleed through. */
+.task-row .roadmap-row-left {
+  background: oklch(0.18 0.01 270);
+}
+.task-row .roadmap-row-right {
+  background: oklch(1 0 0 / 0.015);
+}
+.theme-light .task-row .roadmap-row-left {
+  background: oklch(0.975 0.005 270);
+}
+.theme-light .task-row .roadmap-row-right {
+  background: oklch(0.2 0.01 270 / 0.015);
+}
+.task-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding-left: 20px;
+}
+.roadmap-task-indent {
+  display: inline-block;
+  width: 4px;
+  height: 18px;
+  background: var(--border-strong);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+.roadmap-task-key {
+  color: var(--ink-2);
+  flex-shrink: 0;
+}
+.roadmap-task-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-3);
+  font-family: var(--font-body);
+  font-size: 11px;
+}
+.roadmap-task-status {
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: oklch(0.5 0.01 270 / 0.18);
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+.roadmap-task-status.done {
+  background: oklch(0.84 0.18 130 / 0.18);
+  color: var(--lime);
+}
+.roadmap-task-status.inprogress {
+  background: oklch(0.82 0.15 75 / 0.18);
+  color: var(--amber);
+}
+
+/* Legend */
+.roadmap-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-top: 10px;
+  margin-top: 6px;
+  border-top: 1px dashed var(--border);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.roadmap-legend .legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.roadmap-legend .legend-sw {
+  width: 16px;
+  height: 8px;
+  border-radius: 2px;
+  display: inline-block;
+}
+.roadmap-legend .legend-sw.done {
+  background: oklch(0.84 0.18 130 / 0.18);
+  border: 1px solid oklch(0.84 0.18 130 / 0.45);
+}
+.roadmap-legend .legend-sw.inprog {
+  background: oklch(0.82 0.15 75 / 0.18);
+  border: 1px solid oklch(0.82 0.15 75 / 0.45);
+}
+.roadmap-legend .legend-sw.todo {
+  background: oklch(0.5 0.01 270 / 0.12);
+  border: 1px dashed oklch(0.5 0.01 270 / 0.5);
+}
+.roadmap-legend .legend-sw.ongoing {
+  background: oklch(0.82 0.15 75 / 0.15);
+  border: 1px solid oklch(0.82 0.15 75 / 0.45);
+  border-right: 2px dashed oklch(0.82 0.15 75 / 0.8);
+}
+.roadmap-legend .legend-sw.sprint-band {
+  background: oklch(0.7 0.12 295 / 0.07);
+  border-left: 1px dashed oklch(0.6 0.01 270);
+}
+.roadmap-legend .legend-sw.today-line {
+  background: transparent;
+  border-left: 2px dashed var(--coral);
+  width: 4px;
+  height: 14px;
+}
+
+/* ============================================================
+   Epic detail panel (slide-in)
+   ============================================================ */
+.epic-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+}
+.epic-detail-backdrop {
+  position: absolute;
+  inset: 0;
+  background: oklch(0 0 0 / 0.4);
+  pointer-events: auto;
+  animation: panel-fade 0.18s ease;
+}
+.epic-detail-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(720px, 92vw);
+  background: var(--bg-card, oklch(0.16 0.01 270));
+  border-left: 1px solid var(--border-strong);
+  box-shadow: -20px 0 60px -10px oklch(0 0 0 / 0.5);
+  overflow-y: auto;
+  pointer-events: auto;
+  animation: panel-slide 0.22s ease;
+}
+.theme-light .epic-detail-panel { background: oklch(0.99 0 0); }
+.epic-detail-close {
+  position: sticky;
+  top: 8px;
+  float: right;
+  margin: 8px 12px 0 0;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: oklch(1 0 0 / 0.04);
+  color: var(--ink-2);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 5;
+}
+.epic-detail-close:hover {
+  background: oklch(1 0 0 / 0.12);
+  color: var(--ink);
+}
+.theme-light .epic-detail-close { background: oklch(0.2 0.01 270 / 0.04); }
+.epic-detail-body {
+  padding: 28px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+@keyframes panel-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes panel-slide {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}

@@ -1,0 +1,387 @@
+// Portfolio Roadmap: one combined Gantt for all epics.
+// - Sticky left column with epic/task meta (chevron, key, name, status, mini progress).
+// - Right side renders a date-axis header + bars per row.
+// - Click chevron to expand an epic and reveal its task rows underneath.
+// - Click epic name to open the side detail panel.
+import { el } from '../ui/dom.js';
+
+const MIN_PX_PER_DAY = 6;
+const MAX_PX_PER_DAY = 22;
+const TARGET_TRACK_WIDTH = 880;
+const LEFT_COL_PX = 280;
+const AXIS_HEIGHT_PX = 30;
+const SPRINT_LABEL_MIN_PX = 40;
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function parseDate(s) {
+  return new Date(s + 'T00:00:00');
+}
+function dateDiffDays(a, b) {
+  return Math.round((b - a) / 86400000);
+}
+function addDays(d, n) {
+  const x = new Date(d);
+  x.setDate(x.getDate() + n);
+  return x;
+}
+function toIso(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function fmtMonthYear(d) {
+  return `${MONTH_ABBR[d.getMonth()]} ${d.getFullYear()}`;
+}
+// Compress a sprint name like "GL APP SPRINT 40" → "S40" so labels fit inside
+// narrow bands instead of overlapping with the next sprint's label.
+function shortSprintLabel(name) {
+  const trailing = (name || '').match(/(\d+)\s*$/);
+  if (trailing) return `S${trailing[1]}`;
+  return (name || '').slice(0, 6);
+}
+
+function applyFilters(epics, filters) {
+  const search = (filters.search || '').toLowerCase().trim();
+  return epics.filter((e) => {
+    if (filters.status !== 'all' && e.status !== filters.status) return false;
+    if (filters.sprintId !== 'all' && !e.sprintIds.includes(filters.sprintId)) return false;
+    if (search) {
+      const hay = `${e.key} ${e.name}`.toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+}
+
+function dateRange(epics, sprints, today) {
+  const dates = [today];
+  for (const sp of sprints) {
+    if (sp.startDate) dates.push(sp.startDate);
+    if (sp.endDate) dates.push(sp.endDate);
+  }
+  for (const e of epics) {
+    if (e.startDate) dates.push(e.startDate);
+    if (e.endDate) dates.push(e.endDate);
+    for (const t of e.tasks) {
+      if (t.startedDate) dates.push(t.startedDate);
+      if (t.doneDate) dates.push(t.doneDate);
+    }
+  }
+  const sorted = dates.slice().sort();
+  return {
+    start: addDays(parseDate(sorted[0]), -2),
+    end: addDays(parseDate(sorted[sorted.length - 1]), 2),
+  };
+}
+
+function progressMini(epic) {
+  const seg = epic.progress.counts;
+  const total = Math.max(1, seg.todo + seg.inprogress + seg.done);
+  const pDone = (seg.done / total) * 100;
+  const pProg = (seg.inprogress / total) * 100;
+  return el('div', { class: 'roadmap-progress' }, [
+    el('div', { class: 'roadmap-progress-track' }, [
+      el('span', { class: 'seg-done', style: { width: `${pDone}%` } }),
+      el('span', { class: 'seg-inprog', style: { width: `${pProg}%` } }),
+    ]),
+    el('div', { class: 'roadmap-progress-meta' }, [
+      el('span', { class: 'pct' }, [`${epic.progress.percent}%`]),
+      el('span', { class: 'count' }, [`${epic.progress.counts.done}/${epic.progress.totalIssues}`]),
+    ]),
+  ]);
+}
+
+function statusPill(epic) {
+  if (epic.isNoEpic) {
+    return el('span', { class: 'roadmap-status-pill loose' }, ['Loose']);
+  }
+  const label =
+    epic.status === 'done' ? 'Done' :
+    epic.status === 'inprogress' ? 'In Prog' :
+    'To Do';
+  return el('span', { class: `roadmap-status-pill ${epic.status}` }, [label]);
+}
+
+function chevron(open) {
+  const cls = `roadmap-chevron ${open ? 'open' : ''}`;
+  return el('span', { class: cls, 'aria-hidden': 'true' }, ['▸']);
+}
+
+// Epic bar: a muted track in the status color, with a solid fill showing the
+// done-percentage of tasks inside. Ongoing epics get a dashed right edge.
+function epicBar(epic, dayToPct, today) {
+  if (!epic.startDate) {
+    return el('div', { class: 'roadmap-bar-empty' }, ['Not started']);
+  }
+  const ongoing = !epic.endDate;
+  const endStr = epic.endDate || today;
+  const left = dayToPct(epic.startDate);
+  const right = dayToPct(endStr);
+  const width = Math.max(0.5, right - left);
+  const pct = epic.progress.percent || 0;
+  const cls = `roadmap-bar epic ${epic.status} ${ongoing ? 'ongoing' : ''}`;
+  return el('div', {
+    class: cls,
+    style: { left: `${left}%`, width: `${width}%` },
+    title: `${epic.key} · ${epic.name}\n${epic.startDate} → ${epic.endDate || 'ongoing'}\nProgress: ${pct}%`,
+  }, [
+    el('div', { class: 'roadmap-bar-fill', style: { width: `${pct}%` } }),
+    el('span', { class: 'roadmap-bar-pct' }, [`${pct}%`]),
+  ]);
+}
+
+function taskBar(task, dayToPct, today, sprints) {
+  if (!task.startedDate) {
+    const sp = sprints.find((s) => s.id === task.sprintId);
+    if (sp?.startDate) {
+      const left = dayToPct(sp.startDate);
+      return el('div', {
+        class: 'roadmap-task-dot',
+        style: { left: `calc(${left}% - 3px)` },
+        title: `${task.key} · not started`,
+      });
+    }
+    return null;
+  }
+  const ongoing = !task.doneDate;
+  const endStr = task.doneDate || today;
+  const left = dayToPct(task.startedDate);
+  const right = dayToPct(endStr);
+  const width = Math.max(0.4, right - left);
+  const cls = `roadmap-bar task ${task.status} ${ongoing ? 'ongoing' : ''}`;
+  return el('div', {
+    class: cls,
+    style: { left: `${left}%`, width: `${width}%` },
+    title: `${task.key} · ${task.statusName || task.status}\nStart: ${task.startedDate}${task.doneDate ? `\nDone: ${task.doneDate}` : '\nOngoing'}`,
+  });
+}
+
+// Sprint band: subtle background tint with sprint boundaries shown via a single
+// left border (avoids the double-edge clutter when sprints are adjacent).
+// Labels are only shown for the active sprint + wide-enough future sprints so
+// they don't overlap each other at typical zoom levels.
+function sprintBands(sprints, dayToPct, rightTrackPx) {
+  const colors = ['band-a', 'band-b', 'band-c'];
+  return sprints
+    .filter((sp) => sp.startDate && sp.endDate)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+    .map((sp, i) => {
+      const left = dayToPct(sp.startDate);
+      const right = dayToPct(sp.endDate);
+      const width = Math.max(0.2, right - left);
+      const widthPx = (width / 100) * rightTrackPx;
+      const stateCls = sp.state === 'active' ? 'active'
+        : sp.state === 'closed' ? 'closed' : 'future';
+      const shortName = (sp.name || '').split(' — ')[0] || sp.name;
+      const showLabel = sp.state === 'active' || widthPx >= SPRINT_LABEL_MIN_PX;
+      const labelText = shortSprintLabel(shortName);
+      return el('div', {
+        class: `roadmap-sprint-band ${colors[i % colors.length]} ${stateCls}`,
+        style: { left: `${left}%`, width: `${width}%` },
+        title: `${sp.name}\n${sp.startDate} → ${sp.endDate}`,
+      }, showLabel ? [
+        el('span', { class: 'roadmap-sprint-band-label' }, [labelText]),
+      ] : []);
+    });
+}
+
+// Top tier of the date axis: month + year bands stretched across each calendar
+// month that overlaps the visible range.
+function monthHeader(rangeStart, rangeEnd, dayToPct) {
+  const bands = [];
+  let cursor = new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1);
+  const safetyLimit = 200;
+  let i = 0;
+  while (cursor < rangeEnd && i++ < safetyLimit) {
+    const nextMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    const clipStart = cursor < rangeStart ? rangeStart : cursor;
+    const clipEnd = nextMonth > rangeEnd ? rangeEnd : nextMonth;
+    const left = dayToPct(toIso(clipStart));
+    const right = dayToPct(toIso(clipEnd));
+    const width = Math.max(0, right - left);
+    bands.push(el('div', {
+      class: 'roadmap-month-band',
+      style: { left: `${left}%`, width: `${width}%` },
+    }, [
+      el('span', { class: 'roadmap-month-label' }, [fmtMonthYear(cursor)]),
+    ]));
+    cursor = nextMonth;
+  }
+  return bands;
+}
+
+function todayMarker(today, dayToPct) {
+  const pct = dayToPct(today);
+  if (pct == null || pct < 0 || pct > 100) return null;
+  return el('div', {
+    class: 'roadmap-today',
+    style: { left: `${pct}%` },
+  }, [el('span', { class: 'roadmap-today-label' }, ['Today'])]);
+}
+
+function epicRow({ epic, expanded, dayToPct, today, onToggle, onOpenDetail }) {
+  const left = el('div', { class: 'roadmap-row-left epic-left' }, [
+    el('button', {
+      class: 'roadmap-chevron-btn',
+      type: 'button',
+      'aria-label': expanded ? 'Collapse' : 'Expand',
+      onClick: () => onToggle(epic.id),
+    }, [chevron(expanded)]),
+    el('div', { class: 'roadmap-meta' }, [
+      el('div', { class: 'roadmap-meta-top' }, [
+        el('span', { class: 'roadmap-key' }, [epic.isNoEpic ? 'NO EPIC' : epic.key]),
+        statusPill(epic),
+      ]),
+      el('button', {
+        class: 'roadmap-name-btn',
+        type: 'button',
+        onClick: () => onOpenDetail(epic.id),
+        title: 'Open details',
+      }, [epic.name]),
+      progressMini(epic),
+    ]),
+  ]);
+
+  const right = el('div', { class: 'roadmap-row-right' }, [
+    epicBar(epic, dayToPct, today),
+  ]);
+
+  return el('div', { class: 'roadmap-row epic-row' }, [left, right]);
+}
+
+function taskRow({ task, dayToPct, today, sprints }) {
+  const left = el('div', { class: 'roadmap-row-left task-left' }, [
+    el('span', { class: 'roadmap-task-indent' }),
+    el('span', { class: 'roadmap-task-key' }, [task.key]),
+    el('span', { class: 'roadmap-task-summary' }, [task.summary || '']),
+    el('span', { class: `roadmap-task-status ${task.status}` }, [
+      task.statusName || task.status,
+    ]),
+  ]);
+  const bar = taskBar(task, dayToPct, today, sprints);
+  const right = el('div', { class: 'roadmap-row-right task' }, bar ? [bar] : []);
+  return el('div', { class: 'roadmap-row task-row' }, [left, right]);
+}
+
+export function renderEpicRoadmap({
+  epics, sprints, today, expandedIds, filters,
+  onToggleExpand, onOpenDetail,
+}) {
+  const filtered = applyFilters(epics, filters);
+
+  if (!filtered.length) {
+    return el('div', { class: 'card roadmap-card' }, [
+      el('h3', { class: 'card-title' }, [
+        el('span', {}, ['Portfolio Roadmap']),
+      ]),
+      el('p', { class: 'roadmap-empty' }, [
+        epics.length
+          ? 'No epics match the current filters.'
+          : 'No epics yet. Once data loads they will appear here.',
+      ]),
+    ]);
+  }
+
+  const { start, end } = dateRange(filtered, sprints, today);
+  const totalDays = Math.max(1, dateDiffDays(start, end));
+  const pxPerDay = Math.max(MIN_PX_PER_DAY, Math.min(MAX_PX_PER_DAY, TARGET_TRACK_WIDTH / totalDays));
+  const trackWidth = Math.max(TARGET_TRACK_WIDTH, totalDays * pxPerDay);
+
+  const dayToPct = (dateStr) => {
+    if (!dateStr) return null;
+    const d = parseDate(dateStr);
+    return (dateDiffDays(start, d) / totalDays) * 100;
+  };
+
+  const rows = [];
+  for (const epic of filtered) {
+    const expanded = expandedIds.has(epic.id);
+    rows.push(epicRow({
+      epic, expanded, dayToPct, today,
+      onToggle: onToggleExpand,
+      onOpenDetail,
+    }));
+    if (expanded) {
+      const STATUS_ORDER = { inprogress: 0, todo: 1, done: 2 };
+      const sorted = [...epic.tasks].sort((a, b) => {
+        const sa = STATUS_ORDER[a.status] ?? 3;
+        const sb = STATUS_ORDER[b.status] ?? 3;
+        if (sa !== sb) return sa - sb;
+        return (a.startedDate || '9999').localeCompare(b.startedDate || '9999');
+      });
+      for (const t of sorted) {
+        rows.push(taskRow({ task: t, dayToPct, today, sprints }));
+      }
+    }
+  }
+
+  // Single-tier date axis: month + year bands (no day numbers — month-band
+  // borders give enough rhythm and dropping the day-tick row removes a lot of
+  // overlay DOM that was costing horizontal-scroll perf).
+  const axis = el('div', { class: 'roadmap-axis' }, [
+    el('div', { class: 'roadmap-axis-months' }, monthHeader(start, end, dayToPct)),
+  ]);
+
+  // Background overlay covers right-track area only (escapes the 280px sticky
+  // left column). Holds sprint bands that span all rows.
+  const rightTrackPx = trackWidth - LEFT_COL_PX;
+  const bgOverlay = el('div', { class: 'roadmap-bg-overlay' }, [
+    el('div', { class: 'roadmap-sprint-bands' }, sprintBands(sprints, dayToPct, rightTrackPx)),
+  ]);
+
+  // Today layer is separate so its z-index can sit above bars but below the
+  // sticky left column.
+  const todayEl = todayMarker(today, dayToPct);
+  const todayLayer = el('div', { class: 'roadmap-today-layer' }, todayEl ? [todayEl] : []);
+
+  const trackInner = el('div', {
+    class: 'roadmap-track-inner',
+    style: { minWidth: `${trackWidth}px` },
+  }, [
+    axis,
+    bgOverlay,
+    todayLayer,
+    el('div', { class: 'roadmap-rows' }, rows),
+  ]);
+
+  const scrollEl = el('div', { class: 'roadmap-scroll' }, [trackInner]);
+
+  // After paint, scroll horizontally so the Today marker sits near the right
+  // edge of the visible area.
+  const todayPctVal = dayToPct(today);
+  if (todayPctVal != null && todayPctVal >= 0 && todayPctVal <= 100) {
+    requestAnimationFrame(() => {
+      if (!scrollEl.isConnected) return;
+      const todayPx = LEFT_COL_PX + (todayPctVal / 100) * (trackWidth - LEFT_COL_PX);
+      // Push Today well inside the viewport so the marker + "Today" label and a
+      // few days of future runway are visible, not clipped at the right edge.
+      const RIGHT_PADDING = 160;
+      const target = Math.max(0, todayPx - scrollEl.clientWidth + RIGHT_PADDING);
+      scrollEl.scrollLeft = target;
+    });
+  }
+
+  const totalTasksExpanded = rows.length - filtered.length;
+  return el('div', { class: 'card roadmap-card' }, [
+    el('h3', { class: 'card-title' }, [
+      el('span', {}, ['Portfolio Roadmap']),
+      el('span', {
+        style: {
+          font: '400 11px var(--font-mono)', color: 'var(--ink-3)',
+          letterSpacing: '0.05em', textTransform: 'none',
+        },
+      }, [
+        `${filtered.length}/${epics.length} epic${epics.length !== 1 ? 's' : ''}` +
+        (totalTasksExpanded ? ` · ${totalTasksExpanded} task${totalTasksExpanded !== 1 ? 's' : ''} shown` : ''),
+      ]),
+    ]),
+    scrollEl,
+    el('div', { class: 'roadmap-legend' }, [
+      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw done' }), 'Done']),
+      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw inprog' }), 'In progress']),
+      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw todo' }), 'Not started']),
+      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw ongoing' }), 'Ongoing (no end)']),
+      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw sprint-band' }), 'Sprint span']),
+      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw today-line' }), 'Today']),
+    ]),
+  ]);
+}

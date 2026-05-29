@@ -99,3 +99,84 @@ export const DEMO_SPRINTS = [
     ],
   },
 ];
+
+// =========== Demo Epic metadata + issue→epic mapping ============
+
+export const DEMO_EPICS = [
+  {
+    key: 'EPIC-100',
+    name: 'Atlas Pipeline Foundations',
+    summary: 'Build the core import + metrics pipeline',
+    status: { name: 'In Progress', statusCategory: { key: 'indeterminate' } },
+  },
+  {
+    key: 'EPIC-101',
+    name: 'Dashboard Insights',
+    summary: 'Burndown, CFD, control chart, and predictive widgets',
+    status: { name: 'In Progress', statusCategory: { key: 'indeterminate' } },
+  },
+  {
+    key: 'EPIC-102',
+    name: 'Auth & Reliability',
+    summary: 'Microsoft SSO, token rotation, and refresh hardening',
+    status: { name: 'Done', statusCategory: { key: 'done' } },
+  },
+];
+
+// Map issue key → epicKey (omitted = "No Epic")
+const ISSUE_TO_EPIC = {
+  'ATL-301': 'EPIC-100',
+  'ATL-302': 'EPIC-100',
+  'ATL-303': 'EPIC-101',
+  'ATL-305': 'EPIC-101',
+  'ATL-306': 'EPIC-102',
+  'ATL-401': 'EPIC-102',
+  'ATL-402': 'EPIC-100',
+  'ATL-403': 'EPIC-101',
+  'ATL-404': 'EPIC-101',
+  'ATL-405': 'EPIC-101',
+  'ATL-406': 'EPIC-101',
+  'ATL-408': 'EPIC-100',
+  'ATL-411': 'EPIC-100',
+  'ATL-413': 'EPIC-102',
+  'ATL-501': 'EPIC-101',
+  'ATL-502': 'EPIC-101',
+};
+
+const CAT_NEW = { name: 'To Do', statusCategory: { key: 'new' } };
+const CAT_INPROG = { name: 'In Progress', statusCategory: { key: 'indeterminate' } };
+const CAT_DONE = { name: 'Done', statusCategory: { key: 'done' } };
+
+const mk = (date, toStatus) => ({ date, toStatus });
+
+// Realistic changelog per task (only set where useful for Gantt demo)
+const ISSUE_STATUS_CHANGES = {
+  // Sprint 23 (closed: 2026-04-20 → 2026-05-08)
+  'ATL-301': [mk('2026-04-20', CAT_NEW), mk('2026-04-20', CAT_INPROG), mk('2026-04-30', CAT_DONE)],
+  'ATL-302': [mk('2026-04-20', CAT_NEW), mk('2026-04-21', CAT_INPROG), mk('2026-04-27', CAT_DONE)],
+  'ATL-303': [mk('2026-04-20', CAT_NEW), mk('2026-04-21', CAT_INPROG), mk('2026-04-28', CAT_DONE)],
+  'ATL-304': [mk('2026-04-22', CAT_NEW), mk('2026-04-24', CAT_INPROG), mk('2026-04-25', CAT_DONE)],
+  'ATL-305': [mk('2026-04-23', CAT_NEW), mk('2026-04-24', CAT_INPROG), mk('2026-04-26', CAT_DONE)],
+  'ATL-306': [mk('2026-04-22', CAT_NEW), mk('2026-04-22', CAT_INPROG), mk('2026-04-29', CAT_DONE)],
+  'ATL-307': [mk('2026-05-05', CAT_NEW), mk('2026-05-06', CAT_INPROG), mk('2026-05-07', CAT_DONE)],
+  // Sprint 24 (active: 2026-05-11 → 2026-05-29, today=2026-05-22)
+  'ATL-401': [mk('2026-05-11', CAT_NEW), mk('2026-05-12', CAT_INPROG), mk('2026-05-16', CAT_DONE)],
+  'ATL-402': [mk('2026-05-11', CAT_NEW), mk('2026-05-14', CAT_INPROG)],
+  'ATL-403': [mk('2026-05-11', CAT_NEW), mk('2026-05-15', CAT_INPROG)],
+  'ATL-404': [mk('2026-05-11', CAT_NEW), mk('2026-05-13', CAT_INPROG)],
+  'ATL-405': [mk('2026-05-11', CAT_NEW), mk('2026-05-12', CAT_INPROG), mk('2026-05-17', CAT_DONE)],
+  'ATL-406': [mk('2026-05-11', CAT_NEW), mk('2026-05-19', CAT_INPROG)],
+  'ATL-407': [mk('2026-05-12', CAT_NEW), mk('2026-05-13', CAT_INPROG), mk('2026-05-14', CAT_DONE)],
+  'ATL-408': [mk('2026-05-11', CAT_NEW), mk('2026-05-13', CAT_INPROG), mk('2026-05-15', CAT_DONE)],
+  'ATL-411': [mk('2026-05-11', CAT_NEW), mk('2026-05-19', CAT_INPROG)],
+  'ATL-413': [mk('2026-05-15', CAT_NEW), mk('2026-05-18', CAT_INPROG), mk('2026-05-20', CAT_DONE)],
+  'ATL-415': [mk('2026-05-11', CAT_NEW), mk('2026-05-14', CAT_INPROG), mk('2026-05-15', CAT_DONE)],
+};
+
+// Enrich DEMO_SPRINTS in place with epicKey + statusChanges per issue
+for (const sp of DEMO_SPRINTS) {
+  for (const iss of sp.issues) {
+    iss.epicKey = ISSUE_TO_EPIC[iss.key] || null;
+    iss.statusChanges = ISSUE_STATUS_CHANGES[iss.key] || [];
+  }
+}

@@ -14,6 +14,17 @@ const state = {
   apiPanelOpen: false,
   pendingBoardId: '',
   loadProgress: null,
+  // Epic view state
+  view: 'sprint',
+  activeEpicId: null,
+  rawEpics: [],
+  epics: [],
+  epicLoadProgress: null,
+  epicError: null,
+  // Roadmap UI state
+  expandedEpicIds: new Set(),
+  epicDetailId: null,
+  epicFilters: { status: 'all', sprintId: 'all', search: '' },
 };
 
 const subscribers = new Set();
@@ -40,4 +51,9 @@ export function subscribe(fn) {
 
 export function activeSprint() {
   return state.sprints.find((s) => s.id === state.activeSprintId) || state.sprints[0];
+}
+
+export function activeEpic() {
+  if (!state.activeEpicId) return state.epics[0] || null;
+  return state.epics.find((e) => e.id === state.activeEpicId) || state.epics[0] || null;
 }

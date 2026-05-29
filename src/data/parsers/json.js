@@ -24,6 +24,13 @@ function toRawIssue(iss) {
     (f.sprint && f.sprint) ||
     (Array.isArray(f.customfield_10020) && f.customfield_10020[0]) ||
     {};
+  const epicKey =
+    (f.parent && f.parent.key) ||
+    f.customfield_10014 ||
+    null;
+  const epicName =
+    (f.parent && f.parent.fields && f.parent.fields.summary) ||
+    null;
   return {
     key: iss.key,
     summary: f.summary || '',
@@ -40,5 +47,7 @@ function toRawIssue(iss) {
     sprintEndDate: sprintObj.endDate ? sprintObj.endDate.slice(0, 10) : null,
     sprintState: (sprintObj.state || '').toLowerCase() || null,
     sprintGoal: sprintObj.goal || '',
+    epicKey,
+    epicName,
   };
 }

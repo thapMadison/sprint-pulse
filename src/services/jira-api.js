@@ -34,3 +34,8 @@ export async function fetchSprintFromWorker(workerUrl, sprintId, boardId) {
 export async function fetchSprintListFromWorker(workerUrl, boardId) {
   return workerGet(workerUrl, `/sprints?boardId=${encodeURIComponent(boardId)}`);
 }
+
+// Fetch all Epic-type issues for the board's project.
+export async function fetchEpicsFromWorker(workerUrl, boardId) {
+  return workerGet(workerUrl, `/epics?boardId=${encodeURIComponent(boardId)}`);
+}

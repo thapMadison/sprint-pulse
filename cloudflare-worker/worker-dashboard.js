@@ -78,7 +78,7 @@ export default {
         const [sprintInfo, issuesData] = await Promise.all([
           jiraFetch(`${env.JIRA_BASE_URL}/rest/agile/1.0/sprint/${sprintId}`, headers),
           jiraFetch(
-            `${env.JIRA_BASE_URL}/rest/agile/1.0/sprint/${sprintId}/issue?fields=summary,status,assignee,timetracking,issuetype,priority,created&expand=changelog&maxResults=200`,
+            `${env.JIRA_BASE_URL}/rest/agile/1.0/sprint/${sprintId}/issue?fields=summary,status,assignee,timetracking,issuetype,priority,created,parent&expand=changelog&maxResults=200`,
             headers
           ),
         ]);
@@ -118,6 +118,8 @@ export default {
             sprintState: (sprintInfo.state || '').toLowerCase(),
             sprintGoal: sprintInfo.goal || '',
             statusChanges: extractStatusChanges(iss.changelog, f.created, status, statusCategoryByName),
+            epicKey: f.parent?.key || null,
+            epicName: f.parent?.fields?.summary || null,
           };
         });
 
@@ -148,7 +150,7 @@ export default {
         const allIssues = [];
         for (const sp of sprints) {
           const issuesData = await jiraFetch(
-            `${env.JIRA_BASE_URL}/rest/agile/1.0/sprint/${sp.id}/issue?fields=summary,status,assignee,timetracking,issuetype,priority&maxResults=200`,
+            `${env.JIRA_BASE_URL}/rest/agile/1.0/sprint/${sp.id}/issue?fields=summary,status,assignee,timetracking,issuetype,priority,parent&maxResults=200`,
             headers
           );
           for (const iss of issuesData.issues || []) {
@@ -172,6 +174,8 @@ export default {
               sprintEndDate: sp.endDate?.slice(0, 10) || null,
               sprintState: (sp.state || '').toLowerCase(),
               sprintGoal: sp.goal || '',
+              epicKey: f.parent?.key || null,
+              epicName: f.parent?.fields?.summary || null,
             });
           }
         }
@@ -179,7 +183,69 @@ export default {
         return json(allIssues, 200, cors);
       }
 
-      return json({ error: 'Not found. Use /sprints, /sprint/:id, or /all' }, 404, cors);
+      // GET /epics - List Epic issues visible on the board.
+      // Preferred path: resolve a projectKey from board configuration and run a
+      // project-wide JQL search (gets all epics in the project, including ones
+      // with no current child issues on the board).
+      // Fallback path: boards without a `location.projectKey` — e.g. boards
+      // backed by a multi-project JQL filter, or kanban boards configured
+      // without a single project context — use Jira's agile `/board/{id}/epic`
+      // endpoint, which returns epics scoped to the board itself.
+      if (path === '/epics') {
+        const boardCfg = await jiraFetch(
+          `${env.JIRA_BASE_URL}/rest/agile/1.0/board/${boardId}/configuration`,
+          headers
+        );
+        const projectKey = boardCfg?.location?.projectKey;
+
+        if (projectKey) {
+          const jql = encodeURIComponent(`project = ${projectKey} AND issuetype = Epic`);
+          const epicData = await jiraFetch(
+            `${env.JIRA_BASE_URL}/rest/api/3/search?jql=${jql}&fields=summary,status&maxResults=200`,
+            headers
+          );
+          const epics = (epicData.issues || []).map((iss) => {
+            const f = iss.fields || {};
+            return {
+              key: iss.key,
+              name: f.summary || iss.key,
+              summary: f.summary || '',
+              status: f.status || { name: 'To Do', statusCategory: { key: 'new' } },
+            };
+          });
+          return json(epics, 200, cors);
+        }
+
+        // Fallback: paginate through `/board/{id}/epic`. The endpoint returns
+        // { values, isLast, startAt } and exposes `done: boolean` per epic —
+        // no full status object, so synthesize one matching the shape the
+        // epic-builder downstream consumes (status.name + status.statusCategory.key).
+        const collected = [];
+        let startAt = 0;
+        const PAGE = 50;
+        for (let i = 0; i < 10; i++) {
+          const page = await jiraFetch(
+            `${env.JIRA_BASE_URL}/rest/agile/1.0/board/${boardId}/epic?startAt=${startAt}&maxResults=${PAGE}`,
+            headers
+          );
+          const values = page?.values || [];
+          collected.push(...values);
+          if (page?.isLast || values.length < PAGE) break;
+          startAt += values.length;
+        }
+
+        const epics = collected.map((iss) => ({
+          key: iss.key,
+          name: iss.name || iss.key,
+          summary: iss.summary || iss.name || '',
+          status: iss.done
+            ? { name: 'Done', statusCategory: { key: 'done' } }
+            : { name: 'In Progress', statusCategory: { key: 'indeterminate' } },
+        }));
+        return json(epics, 200, cors);
+      }
+
+      return json({ error: 'Not found. Use /sprints, /sprint/:id, /all, or /epics' }, 404, cors);
 
     } catch (error) {
       return json({ error: error.message }, 500, cors);

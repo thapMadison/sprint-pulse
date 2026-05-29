@@ -89,6 +89,8 @@ export function buildSprintsFromIssues(rawIssues, today) {
       timeSpent: Number(r.timeSpent) || 0,
       remainingEstimate: Number(r.remainingEstimate) || 0,
       statusChanges: r.statusChanges || [],
+      epicKey: r.epicKey || null,
+      epicName: r.epicName || null,
     });
   }
 

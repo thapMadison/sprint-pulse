@@ -75,6 +75,19 @@ export function parseJiraXML(text_) {
       Array.isArray(sprintVals) ? sprintVals[sprintVals.length - 1] : sprintVals
     );
 
+    // Epic link: try <parent> element first, then "Epic Link" custom field
+    const parentEl = item.getElementsByTagName('parent')[0];
+    let epicKey = parentEl ? (parentEl.getAttribute('key') || (parentEl.textContent || '').trim() || null) : null;
+    let epicName = parentEl ? (parentEl.getAttribute('summary') || null) : null;
+    if (!epicKey) {
+      const epicLink = findCustomField(item, 'Epic Link');
+      epicKey = Array.isArray(epicLink) ? (epicLink[0] || null) : (epicLink || null);
+    }
+    if (!epicName) {
+      const epicNameVal = findCustomField(item, 'Epic Name');
+      epicName = Array.isArray(epicNameVal) ? (epicNameVal[0] || null) : (epicNameVal || null);
+    }
+
     raws.push({
       key,
       summary: text(item, 'summary'),
@@ -91,6 +104,8 @@ export function parseJiraXML(text_) {
       sprintEndDate: sprintInfo.endDate,
       sprintState: sprintInfo.state,
       sprintGoal: sprintInfo.goal,
+      epicKey,
+      epicName,
     });
   }
   return raws;

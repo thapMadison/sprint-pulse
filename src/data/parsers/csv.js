@@ -108,6 +108,8 @@ export function parseJiraCSV(text) {
   const spentIdxs = findCol(headers, ['Σ Time Spent', 'Time Spent', 'Time spent']);
   const remIdxs = findCol(headers, ['Σ Remaining Estimate', 'Remaining Estimate', 'Remaining estimate']);
   const sprintIdxs = findCol(headers, ['Sprint']);
+  const epicKeyIdxs = findCol(headers, ['Parent', 'Parent Key', 'Custom field (Epic Link)', 'Epic Link']);
+  const epicNameIdxs = findCol(headers, ['Parent summary', 'Custom field (Epic Name)']);
 
   if (keyIdx == null) {
     throw new Error('CSV does not look like a Jira export — missing "Issue key" column.');
@@ -136,6 +138,8 @@ export function parseJiraCSV(text) {
       timeSpent: toHours(parseSeconds(firstNonEmpty(row, spentIdxs))),
       remainingEstimate: toHours(parseSeconds(firstNonEmpty(row, remIdxs))),
       sprintName: lastSprint(row, sprintIdxs),
+      epicKey: firstNonEmpty(row, epicKeyIdxs) || null,
+      epicName: firstNonEmpty(row, epicNameIdxs) || null,
     });
   }
   return raws;
