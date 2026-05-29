@@ -35,6 +35,11 @@ export async function fetchSprintListFromWorker(workerUrl, boardId) {
   return workerGet(workerUrl, `/sprints?boardId=${encodeURIComponent(boardId)}`);
 }
 
+// Fetch board metadata (name/type) for display labels.
+export async function fetchBoardFromWorker(workerUrl, boardId) {
+  return workerGet(workerUrl, `/board?boardId=${encodeURIComponent(boardId)}`);
+}
+
 // Fetch all Epic-type issues for the board's project.
 export async function fetchEpicsFromWorker(workerUrl, boardId) {
   return workerGet(workerUrl, `/epics?boardId=${encodeURIComponent(boardId)}`);

@@ -28,7 +28,7 @@ Any static server works (`npx serve`, `php -S localhost:8080`, etc.).
 The bar between the topbar and the sprint filter lets you switch between:
 
 1. **Demo data** (default) — three bundled sprints from the design so you can see the dashboard immediately.
-2. **Connect Jira API** — enter your Atlassian Cloud base URL, email, API token, and Board ID. The page calls:
+2. **Connect with Jira** — enter your Atlassian Cloud base URL, email, API token, and Board ID. The page calls:
    ```
    GET {base}/rest/agile/1.0/board/{boardId}/sprint?state=active,closed,future
    GET {base}/rest/agile/1.0/sprint/{sprintId}/issue?fields=summary,status,assignee,timetracking,issuetype,priority

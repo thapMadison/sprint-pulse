@@ -218,13 +218,29 @@ function renderStatusCard(sprint) {
   ]);
 }
 
+function renderSprintSkeleton(sprint) {
+  const ghostCard = () => el('div', { class: 'card skeleton-card' }, []);
+  return [
+    el('div', { class: 'banner info sprint-load-banner' }, [
+      el('span', { class: 'spinner-mini' }),
+      el('span', {}, [`Loading ${sprint?.name || 'sprint'} data…`]),
+    ]),
+    el('div', { class: 'row cols-2' }, [ghostCard(), ghostCard()]),
+    el('div', { class: 'row cols-2' }, [ghostCard(), ghostCard()]),
+    el('div', { class: 'row' }, [ghostCard()]),
+  ];
+}
+
 function renderEpicLoadingBanner(progress) {
   const pct = Math.max(0, Math.min(100, progress.percent || 0));
+  const hasStep = progress.step != null && progress.total != null;
   return el('div', { class: 'banner info epic-load-banner' }, [
     el('div', { class: 'epic-load-row' }, [
       el('span', { class: 'spinner-mini' }),
       el('span', { class: 'epic-load-label' }, [progress.label || 'Loading epic data…']),
-      el('span', { class: 'epic-load-step' }, [`${progress.step}/${progress.total}`]),
+      hasStep
+        ? el('span', { class: 'epic-load-step' }, [`${progress.step}/${progress.total}`])
+        : null,
     ]),
     el('div', { class: 'epic-load-track' }, [
       el('span', { style: { width: `${pct}%` } }),
@@ -348,7 +364,6 @@ export function render() {
     children.push(...renderEpicView());
   } else {
     const sprint = activeSprint();
-    const series = generateDailySeries(sprint, s.today);
 
     children.push(renderSprintFilter({
       sprints: s.sprints,
@@ -356,19 +371,27 @@ export function render() {
       onChange: setActiveSprint,
     }));
 
-    const hero = renderSprintHero({ sprint, today: s.today });
-    hero.appendChild(renderStatusCard(sprint));
-    children.push(hero);
+    // Issues for this sprint are fetched on demand — show a skeleton until they arrive
+    // so the charts don't flash empty zeroes.
+    if (sprint && sprint.issuesLoaded === false) {
+      children.push(...renderSprintSkeleton(sprint));
+    } else {
+      const series = generateDailySeries(sprint, s.today);
 
-    children.push(el('div', { class: 'row cols-2' }, [
-      chartCard('Burndown', renderBurndown(series), 'burndown'),
-      chartCard('Cumulative Flow', renderCFD(series), 'cfd'),
-    ]));
-    children.push(el('div', { class: 'row cols-2' }, [
-      chartCard('Burnup', renderBurnup(series), 'burnup'),
-      chartCard('Control Chart', renderControl(series), 'control'),
-    ]));
-    children.push(el('div', { class: 'row' }, [renderWorkloadTable({ sprint })]));
+      const hero = renderSprintHero({ sprint, today: s.today });
+      hero.appendChild(renderStatusCard(sprint));
+      children.push(hero);
+
+      children.push(el('div', { class: 'row cols-2' }, [
+        chartCard('Burndown', renderBurndown(series), 'burndown'),
+        chartCard('Cumulative Flow', renderCFD(series), 'cfd'),
+      ]));
+      children.push(el('div', { class: 'row cols-2' }, [
+        chartCard('Burnup', renderBurnup(series), 'burnup'),
+        chartCard('Control Chart', renderControl(series), 'control'),
+      ]));
+      children.push(el('div', { class: 'row' }, [renderWorkloadTable({ sprint })]));
+    }
   }
 
   children.push(el('footer', { class: 'footer' }, [

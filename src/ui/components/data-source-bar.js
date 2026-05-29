@@ -52,17 +52,17 @@ function buildInlineBoardInput({ pendingBoardId, workerUrl }) {
   });
   boardIdInput.addEventListener('input', () => setPendingBoardId(boardIdInput.value));
 
-  const submit = el('button', { class: 'submit-board', type: 'button' }, ['Load sprints']);
+  const submit = el('button', { class: 'submit-board', type: 'button' }, ['Load board']);
   submit.addEventListener('click', async () => {
     const boardId = boardIdInput.value.trim();
     if (!workerUrl) return;
     submit.disabled = true;
-    submit.textContent = 'Loading…';
+    submit.textContent = 'Connecting…';
     try {
       await loadFromApi(boardId);
     } finally {
       submit.disabled = false;
-      submit.textContent = 'Load sprints';
+      submit.textContent = 'Load board';
     }
   });
 
@@ -105,7 +105,7 @@ export function renderDataSource({
         }
         setApiPanelOpen(!apiPanelOpen);
       },
-    }, ['Connect Jira API']);
+    }, ['Connect with Jira']);
 
     const fileBtn = el('button', {
       class: `ds-btn ${activeSource === 'file' ? 'active' : ''} ${!authed ? 'disabled' : ''}`,

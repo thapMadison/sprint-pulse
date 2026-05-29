@@ -671,7 +671,7 @@ html.theme-light {
 .chart-info-btn:hover::before {
   opacity: 1;
 }
-.chart-info-btn.accent-coral  { --accent-color: var(--coral);  --accent-gradient: linear-gradient(135deg, var(--coral), var(--amber));   --accent-glow: oklch(0.7 0.18 30 / 0.5); }
+.chart-info-btn.accent-coral  { --accent-color: var(--coral);  --accent-gradient: linear-gradient(135deg, oklch(0.79 0.19 18), var(--coral));  --accent-glow: oklch(0.7 0.18 30 / 0.5); }
 .chart-info-btn.accent-amber  { --accent-color: var(--amber);  --accent-gradient: linear-gradient(135deg, var(--amber), var(--coral));   --accent-glow: oklch(0.78 0.16 75 / 0.5); }
 .chart-info-btn.accent-lime   { --accent-color: var(--lime);   --accent-gradient: linear-gradient(135deg, var(--lime), var(--cyan));     --accent-glow: oklch(0.82 0.18 130 / 0.55); }
 .chart-info-btn.accent-violet { --accent-color: var(--violet); --accent-gradient: linear-gradient(135deg, var(--violet), var(--cyan));   --accent-glow: oklch(0.7 0.18 295 / 0.5); }
@@ -739,7 +739,7 @@ html.theme-light {
     opacity 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
     transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.chart-tooltip-popover.accent-coral  { --accent-color: var(--coral);  --accent-gradient: linear-gradient(135deg, var(--coral), var(--amber));   --accent-tint: oklch(0.7 0.18 30 / 0.1); }
+.chart-tooltip-popover.accent-coral  { --accent-color: var(--coral);  --accent-gradient: linear-gradient(135deg, oklch(0.79 0.19 18), var(--coral));  --accent-tint: oklch(0.7 0.18 30 / 0.1); }
 .chart-tooltip-popover.accent-amber  { --accent-color: var(--amber);  --accent-gradient: linear-gradient(135deg, var(--amber), var(--coral));   --accent-tint: oklch(0.78 0.16 75 / 0.1); }
 .chart-tooltip-popover.accent-lime   { --accent-color: var(--lime);   --accent-gradient: linear-gradient(135deg, var(--lime), var(--cyan));     --accent-tint: oklch(0.82 0.18 130 / 0.1); }
 .chart-tooltip-popover.accent-violet { --accent-color: var(--violet); --accent-gradient: linear-gradient(135deg, var(--violet), var(--cyan));   --accent-tint: oklch(0.7 0.18 295 / 0.1); }
@@ -1051,11 +1051,19 @@ html.theme-light {
   transition: all 0.18s ease;
 }
 .view-tab:hover { color: var(--ink-2); background: oklch(1 0 0 / 0.04); }
+/* Icons read brighter than the muted label text so they stay legible when inactive. */
+.view-tab svg { stroke: var(--ink-2); transition: stroke 0.18s ease, filter 0.18s ease; }
+.view-tab:hover svg { stroke: var(--ink); }
 .view-tab.active {
   background: linear-gradient(135deg, oklch(0.7 0.18 295 / 0.18), oklch(0.82 0.13 200 / 0.12));
   color: var(--ink);
   box-shadow: inset 0 0 0 1px oklch(0.7 0.18 295 / 0.35);
 }
+/* Light up the active tab's icon with the brand violet→cyan gradient + soft glow.
+   Tabs render in order: 1 = Sprint, 2 = Epic. */
+.view-tab.active:nth-child(1) svg { stroke: url(#vtGradSprint); }
+.view-tab.active:nth-child(2) svg { stroke: url(#vtGradEpic); }
+.view-tab.active svg { filter: drop-shadow(0 0 5px oklch(0.7 0.18 295 / 0.45)); }
 .theme-light .view-tab:hover { background: oklch(0.2 0.01 270 / 0.04); }
 
 /* --- Epic loading banner --- */
@@ -1091,6 +1099,8 @@ html.theme-light {
   transition: width 0.3s ease;
 }
 .spinner-mini {
+  flex-shrink: 0;
+  box-sizing: border-box;
   width: 12px;
   height: 12px;
   border: 2px solid oklch(0.7 0.18 295 / 0.25);
@@ -1926,6 +1936,41 @@ html.theme-light {
     90deg,
     transparent 0%,
     oklch(0.5 0 0 / 0.1) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+}
+
+/* Sprint view skeleton while a sprint's issues load on demand */
+.sprint-load-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.skeleton-card {
+  min-height: 260px;
+  position: relative;
+  overflow: hidden;
+}
+.skeleton-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(1 0 0 / 0.06) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  pointer-events: none;
+}
+.theme-light .skeleton-card::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(0.5 0 0 / 0.08) 50%,
     transparent 100%
   );
   background-size: 200% 100%;

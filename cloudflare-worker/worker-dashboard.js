@@ -61,6 +61,15 @@ export default {
     };
 
     try {
+      // GET /board - Board metadata (name/type) for display labels.
+      if (path === '/board') {
+        const data = await jiraFetch(
+          `${env.JIRA_BASE_URL}/rest/agile/1.0/board/${boardId}`,
+          headers
+        );
+        return json({ id: data.id, name: data.name || null, type: data.type || null }, 200, cors);
+      }
+
       // GET /sprints - List all sprints for the board
       if (path === '/sprints' || path === '/') {
         const data = await jiraFetch(
@@ -328,7 +337,7 @@ export default {
         }, 200, cors);
       }
 
-      return json({ error: 'Not found. Use /sprints, /sprint/:id, /all, /epics, or /epic/:key' }, 404, cors);
+      return json({ error: 'Not found. Use /board, /sprints, /sprint/:id, /all, /epics, or /epic/:key' }, 404, cors);
 
     } catch (error) {
       return json({ error: error.message }, 500, cors);

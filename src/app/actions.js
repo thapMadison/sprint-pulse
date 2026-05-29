@@ -2,20 +2,26 @@
 // Components dispatch through these functions and read via getState().
 import { DEMO_SPRINTS, DEMO_TODAY } from '../data/demo.js';
 import { todayISO } from '../domain/working-days.js';
-import { buildSprintsFromIssues } from '../domain/sprint-builder.js';
+import { buildSprintsFromIssues, buildSprintShells, populateSprintIssues } from '../domain/sprint-builder.js';
 import { buildLightweightEpics, enrichEpicWithDetail } from '../domain/epic-builder.js';
 import { parseFile } from '../data/parsers/index.js';
 import {
   signInWithMicrosoft, signOut, isAuthenticated, getWorkerUrl,
 } from '../services/auth.js';
 import {
-  fetchAllFromWorker, fetchSprintFromWorker, fetchSprintListFromWorker,
+  fetchSprintFromWorker, fetchSprintListFromWorker, fetchBoardFromWorker,
   fetchEpicsFromWorker, fetchEpicIssuesFromWorker,
 } from '../services/jira-api.js';
 import { setState, setStateSilent, getState } from './state.js';
 import { DEMO_EPICS } from '../data/demo.js';
 
 const BOARD_ID_KEY = 'jira_board_id';
+
+// Prefer the human-readable board name; fall back to the numeric id.
+function apiSourceLabel(board, boardId) {
+  const name = board && board.name ? board.name.trim() : '';
+  return name ? `Jira API · ${name}` : `Jira API · Board ${boardId}`;
+}
 
 function pickInitialSprintId(sprints) {
   const preferred =
@@ -27,59 +33,54 @@ function pickInitialSprintId(sprints) {
 
 export function setActiveSprint(id) {
   setState({ activeSprintId: id });
-  // Lazy-load changelog for accurate CFD when viewing a Jira-sourced sprint
+  // Lazy-load this sprint's issues + changelog the first time it's viewed.
   if (getState().sourceKey === 'api') {
-    loadSprintChangelog(id).catch((e) => {
-      console.warn('[CFD] changelog load failed:', e);
+    loadSprintDetail(id).catch((e) => {
+      console.warn('[Sprint] detail load failed:', e);
     });
   }
 }
 
-async function loadSprintChangelog(sprintId) {
-  const s = getState();
-  const sprint = s.sprints.find((sp) => sp.id === sprintId);
-  if (!sprint) return;
-  // Empty array is truthy — check length to detect "actually loaded".
-  if (sprint.issues.length && sprint.issues[0].statusChanges?.length) return;
+function markSprintLoaded(sprintId, error) {
+  const latest = getState();
+  const updated = latest.sprints.map((sp) =>
+    sp.id === sprintId ? { ...sp, issuesLoaded: true, issuesError: error || null } : sp
+  );
+  setState({ sprints: updated });
+}
+
+// Fetch a single sprint's issues (with changelog) on demand and merge into state.
+// Short-circuits when the sprint is already loaded, so re-selecting a tab is free.
+async function loadSprintDetail(sprintId) {
+  const sprint = getState().sprints.find((sp) => sp.id === sprintId);
+  if (!sprint || sprint.issuesLoaded) return;
 
   const workerUrl = await getWorkerUrl();
-  if (!workerUrl) return;
+  if (!workerUrl) { markSprintLoaded(sprintId, 'Worker URL not configured.'); return; }
   const boardId = localStorage.getItem(BOARD_ID_KEY);
-  if (!boardId) return;
+  if (!boardId) { markSprintLoaded(sprintId, 'Board ID not set.'); return; }
 
-  // Resolve the Jira numeric sprint ID. Old worker /all responses may omit sprintId,
-  // so fall back to looking it up by name from /sprints.
+  // Resolve the Jira numeric sprint ID. Shells carry jiraId from /sprints; fall
+  // back to a name lookup just in case it's missing.
   let jiraId = sprint.jiraId;
   if (!jiraId) {
     try {
       const list = await fetchSprintListFromWorker(workerUrl, boardId);
-      const found = (list || []).find((sp) => sp.name === sprint.name);
-      jiraId = found?.id;
-    } catch {
-      return;
-    }
+      jiraId = (list || []).find((sp) => sp.name === sprint.name)?.id;
+    } catch { /* fall through to error below */ }
   }
-  if (!jiraId) return;
+  if (!jiraId) { markSprintLoaded(sprintId, 'Could not resolve Jira sprint id.'); return; }
 
-  const data = await fetchSprintFromWorker(workerUrl, jiraId, boardId);
-  const changesByKey = new Map();
-  for (const iss of data.issues || []) {
-    changesByKey.set(iss.key, iss.statusChanges || []);
+  try {
+    const data = await fetchSprintFromWorker(workerUrl, jiraId, boardId);
+    const latest = getState();
+    const updated = latest.sprints.map((sp) =>
+      sp.id === sprintId ? populateSprintIssues({ ...sp, jiraId }, data.issues || []) : sp
+    );
+    setState({ sprints: updated });
+  } catch (e) {
+    markSprintLoaded(sprintId, e.message || String(e));
   }
-
-  const latest = getState();
-  const updated = latest.sprints.map((sp) => {
-    if (sp.id !== sprintId) return sp;
-    return {
-      ...sp,
-      jiraId: sp.jiraId || jiraId,
-      issues: sp.issues.map((iss) => ({
-        ...iss,
-        statusChanges: changesByKey.get(iss.key) || [],
-      })),
-    };
-  });
-  setState({ sprints: updated });
 }
 
 export function setApiPanelOpen(open) {
@@ -242,6 +243,17 @@ async function loadEpicsAndChangelogs() {
   }
 }
 
+// After a fresh data load the Epic tab's state was reset to empty. If the user
+// is currently on that tab, rebuild now — switching tabs is what normally
+// triggers the load, but the tab didn't change so we trigger it explicitly.
+function reloadEpicsIfActive() {
+  if (getState().view === 'epic') {
+    loadEpicsAndChangelogs().catch((e) => {
+      console.warn('[Epic] reload after data load failed:', e);
+    });
+  }
+}
+
 export function setPendingBoardId(v) {
   // No re-render — would steal focus from the input the user is typing into.
   setStateSilent({ pendingBoardId: v });
@@ -346,6 +358,7 @@ export function loadDemo() {
     epicLoadProgress: null,
     epicError: null,
   });
+  reloadEpicsIfActive();
 }
 
 export async function loadFromFile(file) {
@@ -357,6 +370,7 @@ export async function loadFromFile(file) {
     const sprints = buildSprintsFromIssues(rawIssues, getState().today);
     applyLoadedSprints(sprints, `File · ${file.name}`, 'file');
     await finishProgress();
+    reloadEpicsIfActive();
   } catch (e) {
     setProgress(null);
     showError(e.message || String(e));
@@ -375,16 +389,23 @@ export async function loadFromApi(boardId) {
 
     localStorage.setItem(BOARD_ID_KEY, boardId);
     setProgress('fetch');
-    const raw = await fetchAllFromWorker(workerUrl, boardId);
-    if (!raw.length) throw new Error('No issues found. Check Board ID and Worker configuration.');
+    // Step 1: board name (for the label) + sprint list, in parallel → render the
+    // filter immediately. Board name is best-effort; fall back to the id on failure.
+    const [board, rawSprints] = await Promise.all([
+      fetchBoardFromWorker(workerUrl, boardId).catch(() => null),
+      fetchSprintListFromWorker(workerUrl, boardId),
+    ]);
+    if (!rawSprints || !rawSprints.length) {
+      throw new Error('No sprints found. Check Board ID and Worker configuration.');
+    }
 
     setProgress('process');
-    const sprints = buildSprintsFromIssues(raw, getState().today);
-    applyLoadedSprints(sprints, `Jira API · Board ${boardId}`, 'api', { apiPanelOpen: false });
+    const sprints = buildSprintShells(rawSprints, getState().today);
+    applyLoadedSprints(sprints, apiSourceLabel(board, boardId), 'api', { apiPanelOpen: false });
+    // Step 2: load only the default (active) sprint's issues for the first paint.
+    await loadSprintDetail(getState().activeSprintId);
     await finishProgress();
-    loadSprintChangelog(getState().activeSprintId).catch((e) => {
-      console.warn('[CFD] changelog load failed:', e);
-    });
+    reloadEpicsIfActive();
     return true;
   } catch (e) {
     setProgress(null);
@@ -411,16 +432,25 @@ export async function refreshFromApi() {
     const workerUrl = await getWorkerUrl();
     if (!workerUrl) throw new Error('Worker URL not configured in Firebase.');
     setProgress('fetch');
-    const raw = await fetchAllFromWorker(workerUrl, boardId);
-    if (!raw.length) throw new Error('No issues found. Check Worker environment variables and Board ID.');
+    const [board, rawSprints] = await Promise.all([
+      fetchBoardFromWorker(workerUrl, boardId).catch(() => null),
+      fetchSprintListFromWorker(workerUrl, boardId),
+    ]);
+    if (!rawSprints || !rawSprints.length) {
+      throw new Error('No sprints found. Check Worker environment variables and Board ID.');
+    }
 
     setProgress('process');
-    const sprints = buildSprintsFromIssues(raw, getState().today);
-    applyLoadedSprints(sprints, `Jira API · Board ${boardId}`, 'api');
+    const prevActive = getState().activeSprintId;
+    const sprints = buildSprintShells(rawSprints, getState().today);
+    applyLoadedSprints(sprints, apiSourceLabel(board, boardId), 'api');
+    // Keep the user on the sprint they were viewing if it still exists.
+    if (sprints.some((sp) => sp.id === prevActive)) {
+      setStateSilent({ activeSprintId: prevActive });
+    }
+    await loadSprintDetail(getState().activeSprintId);
     await finishProgress();
-    loadSprintChangelog(getState().activeSprintId).catch((e) => {
-      console.warn('[CFD] changelog load failed:', e);
-    });
+    reloadEpicsIfActive();
   } catch (e) {
     setProgress(null);
     showError(e.message || String(e));

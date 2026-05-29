@@ -53,6 +53,25 @@ function inferDatesAndState(sp, todayDate) {
   }
 }
 
+// Normalize one raw issue (worker / parser shape) into the app's issue model.
+function normalizeIssue(r, userFor) {
+  return {
+    key: r.key,
+    summary: r.summary,
+    assignee: userFor(r.assigneeName, r.assigneeId),
+    status: normalizeStatus(r.status),
+    statusName: extractStatusName(r.status),
+    priority: r.priority || 'Medium',
+    type: r.type || 'Task',
+    originalEstimate: Number(r.originalEstimate) || 0,
+    timeSpent: Number(r.timeSpent) || 0,
+    remainingEstimate: Number(r.remainingEstimate) || 0,
+    statusChanges: r.statusChanges || [],
+    epicKey: r.epicKey || null,
+    epicName: r.epicName || null,
+  };
+}
+
 export function buildSprintsFromIssues(rawIssues, today) {
   const userFor = makeUserPool();
   const sprintMap = new Map();
@@ -69,6 +88,8 @@ export function buildSprintsFromIssues(rawIssues, today) {
         endDate: r.sprintEndDate || null,
         state: r.sprintState || null,
         issues: [],
+        // Issues built eagerly from a full issue list — already complete.
+        issuesLoaded: true,
       });
     }
     const sp = sprintMap.get(spName);
@@ -77,21 +98,7 @@ export function buildSprintsFromIssues(rawIssues, today) {
     if (!sp.state && r.sprintState) sp.state = r.sprintState;
     if (!sp.goal && r.sprintGoal) sp.goal = r.sprintGoal;
 
-    sp.issues.push({
-      key: r.key,
-      summary: r.summary,
-      assignee: userFor(r.assigneeName, r.assigneeId),
-      status: normalizeStatus(r.status),
-      statusName: extractStatusName(r.status),
-      priority: r.priority || 'Medium',
-      type: r.type || 'Task',
-      originalEstimate: Number(r.originalEstimate) || 0,
-      timeSpent: Number(r.timeSpent) || 0,
-      remainingEstimate: Number(r.remainingEstimate) || 0,
-      statusChanges: r.statusChanges || [],
-      epicKey: r.epicKey || null,
-      epicName: r.epicName || null,
-    });
+    sp.issues.push(normalizeIssue(r, userFor));
   }
 
   const sprints = Array.from(sprintMap.values());
@@ -100,4 +107,42 @@ export function buildSprintsFromIssues(rawIssues, today) {
 
   sprints.sort((a, b) => (a.startDate < b.startDate ? -1 : 1));
   return sprints;
+}
+
+// Build lightweight sprint "shells" from the board's sprint list (worker /sprints).
+// Shells carry metadata only — issues are loaded on demand per sprint via /sprint/:id,
+// so the initial Sprint view paints after one cheap call instead of pulling every
+// sprint's issues up front.
+export function buildSprintShells(rawSprints, today) {
+  const todayDate = new Date(today + 'T00:00:00');
+  const shells = (rawSprints || []).map((sp) => {
+    const shell = {
+      id: String(sp.name || sp.id).toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      jiraId: sp.id || null,
+      name: sp.name || `Sprint ${sp.id}`,
+      goal: sp.goal || '',
+      startDate: sp.startDate ? sp.startDate.slice(0, 10) : null,
+      endDate: sp.endDate ? sp.endDate.slice(0, 10) : null,
+      state: (sp.state || '').toLowerCase() || null,
+      issues: [],
+      issuesLoaded: false,
+    };
+    inferDatesAndState(shell, todayDate);
+    return shell;
+  });
+  shells.sort((a, b) => (a.startDate < b.startDate ? -1 : 1));
+  return shells;
+}
+
+// Populate a sprint shell with normalized issues from a /sprint/:id response.
+// The worker already returns issues in raw-issue shape (including statusChanges),
+// so a single call gives everything the charts and workload table need.
+export function populateSprintIssues(sprint, rawIssues) {
+  const userFor = makeUserPool();
+  return {
+    ...sprint,
+    issues: (rawIssues || []).map((r) => normalizeIssue(r, userFor)),
+    issuesLoaded: true,
+    issuesError: null,
+  };
 }
