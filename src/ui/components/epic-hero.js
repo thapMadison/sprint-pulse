@@ -67,6 +67,7 @@ function statTile({ label, value, sub, accentBg, fillPct }) {
 
 export function renderEpicHero({ epic, today }) {
   const isOngoing = epic.status === 'inprogress';
+  const isLoading = !epic.detailLoaded;
   const durationLabel = epic.endDate
     ? `${daysBetween(epic.startDate, epic.endDate)}`
     : epic.startDate
@@ -85,14 +86,17 @@ export function renderEpicHero({ epic, today }) {
       : ['In progress'];
   const endSub = epic.endDate ? fmtDow(epic.endDate) : 'no end yet';
 
-  return el('div', { class: 'sprint-hero epic-hero' }, [
+  return el('div', { class: `sprint-hero epic-hero ${isLoading ? 'loading' : ''}` }, [
     el('div', { class: 'card sprint-card epic-hero-card' }, [
       el('div', { class: 'sprint-card-header' }, [
         el('div', { class: 'name' }, [
           el('span', { class: 'epic-hero-key' }, [epic.isNoEpic ? 'NO EPIC' : epic.key]),
           el('span', { class: 'epic-hero-name' }, [epic.name]),
         ]),
-        statusBadge(epic),
+        el('div', { class: 'epic-hero-badges' }, [
+          isLoading ? el('span', { class: 'epic-hero-badge loading' }, ['Loading...']) : null,
+          statusBadge(epic),
+        ].filter(Boolean)),
       ]),
       epic.summary && !epic.isNoEpic
         ? el('p', { class: 'epic-hero-summary' }, [epic.summary])

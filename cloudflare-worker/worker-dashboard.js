@@ -201,7 +201,7 @@ export default {
         if (projectKey) {
           const jql = encodeURIComponent(`project = ${projectKey} AND issuetype = Epic`);
           const epicData = await jiraFetch(
-            `${env.JIRA_BASE_URL}/rest/api/3/search?jql=${jql}&fields=summary,status&maxResults=200`,
+            `${env.JIRA_BASE_URL}/rest/api/3/search/jql?jql=${jql}&fields=summary,status&maxResults=200`,
             headers
           );
           const epics = (epicData.issues || []).map((iss) => {
@@ -245,7 +245,90 @@ export default {
         return json(epics, 200, cors);
       }
 
-      return json({ error: 'Not found. Use /sprints, /sprint/:id, /all, or /epics' }, 404, cors);
+      // GET /epic/:epicKey - Get all child issues of an epic with changelog.
+      // Used for progressive loading in the Epic tab: fetch detail per epic
+      // rather than per sprint, so each epic's roadmap bar can render as soon
+      // as its data arrives.
+      const epicIssuesMatch = path.match(/^\/epic\/([A-Z]+-\d+)$/i);
+      if (epicIssuesMatch) {
+        const epicKey = epicIssuesMatch[1].toUpperCase();
+
+        // Fetch epic metadata first
+        const epicJql = encodeURIComponent(`key = ${epicKey}`);
+        const epicData = await jiraFetch(
+          `${env.JIRA_BASE_URL}/rest/api/3/search/jql?jql=${epicJql}&fields=summary,status`,
+          headers
+        );
+        const epicIssue = epicData.issues?.[0];
+        if (!epicIssue) {
+          return json({ error: `Epic ${epicKey} not found` }, 404, cors);
+        }
+
+        // Fetch all child issues with changelog
+        const childJql = encodeURIComponent(`parent = ${epicKey} ORDER BY created ASC`);
+        const issuesData = await jiraFetch(
+          `${env.JIRA_BASE_URL}/rest/api/3/search/jql?jql=${childJql}&fields=summary,status,assignee,timetracking,issuetype,priority,created,customfield_10020&expand=changelog&maxResults=200`,
+          headers
+        );
+
+        const rawIssues = issuesData.issues || [];
+
+        // Build statusCategory map from all statuses in the result set
+        const statusCategoryByName = {};
+        for (const iss of rawIssues) {
+          const st = iss.fields?.status;
+          if (st?.name && st?.statusCategory) {
+            statusCategoryByName[st.name] = st.statusCategory;
+          }
+        }
+
+        // Transform issues
+        const issues = rawIssues.map((iss) => {
+          const f = iss.fields || {};
+          const tt = f.timetracking || {};
+          const assignee = f.assignee || {};
+          const status = f.status || { name: 'To Do', statusCategory: { key: 'new' } };
+
+          // Extract sprint info from customfield_10020 (sprint field)
+          const sprintField = f.customfield_10020;
+          const activeSprint = Array.isArray(sprintField)
+            ? sprintField.find((s) => s.state === 'active') || sprintField[sprintField.length - 1]
+            : null;
+
+          return {
+            key: iss.key,
+            summary: f.summary || '',
+            type: f.issuetype?.name || 'Task',
+            priority: f.priority?.name || 'Medium',
+            status,
+            assigneeName: assignee.displayName || 'Unassigned',
+            assigneeId: assignee.accountId || '',
+            originalEstimate: toHours(tt.originalEstimateSeconds),
+            timeSpent: toHours(tt.timeSpentSeconds),
+            remainingEstimate: toHours(tt.remainingEstimateSeconds),
+            sprintId: activeSprint?.id || null,
+            sprintName: activeSprint?.name || null,
+            sprintStartDate: activeSprint?.startDate?.slice(0, 10) || null,
+            sprintEndDate: activeSprint?.endDate?.slice(0, 10) || null,
+            sprintState: (activeSprint?.state || '').toLowerCase(),
+            epicKey,
+            epicName: epicIssue.fields?.summary || epicKey,
+            statusChanges: extractStatusChanges(iss.changelog, f.created, status, statusCategoryByName),
+          };
+        });
+
+        return json({
+          epic: {
+            key: epicKey,
+            name: epicIssue.fields?.summary || epicKey,
+            status: epicIssue.fields?.status || { name: 'To Do', statusCategory: { key: 'new' } },
+          },
+          issues,
+          statusCategoryByName,
+        }, 200, cors);
+      }
+
+      return json({ error: 'Not found. Use /sprints, /sprint/:id, /all, /epics, or /epic/:key' }, 404, cors);
 
     } catch (error) {
       return json({ error: error.message }, 500, cors);

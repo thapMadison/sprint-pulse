@@ -12,7 +12,7 @@ Sprint Pulse is a zero-build, vanilla HTML/CSS/JS Jira analytics dashboard. Ther
 - `src/domain/` — pure logic. `status.js` collapses `statusCategory` → `todo|inprogress|done` (name-based fallback for CSV); `working-days.js` excludes Sat/Sun; `series.js` produces the daily series for every chart; `sprint-builder.js` and `epic-builder.js` group raw issues into the normalized shapes.
 - `src/charts/` — SVG renderers. `svg.js` is the shared `svg()` / `path()` / `smoothPath()` helper; each chart file (`burndown`, `burnup`, `cfd`, `control`, `donut`, `epic-timeline`) returns a detached DOM node.
 - `src/ui/` — `dom.js` exports the `el()` helper used everywhere; `chart-helpers.js` holds shared axis/scale utilities; `components/` exports one `renderX()` function per file.
-- `cloudflare-worker/` — Worker proxy (`worker.js` + `wrangler.toml`) that holds Jira credentials and exposes `/all`, `/sprint/:id`, `/sprints`, `/epics`. The browser only knows the Worker URL plus `boardId`.
+- `cloudflare-worker/` — Worker proxy (`worker-dashboard.js` + `wrangler.toml`) that holds Jira credentials and exposes `/all`, `/sprint/:id`, `/sprints`, `/epics`, `/epic/:key`. The browser only knows the Worker URL plus `boardId`.
 
 `assets/styles.css` is the design-system port (treat as 1-for-1 with the source design); `assets/extras.css` is reserved for additions that don't belong in the ported file.
 
@@ -50,4 +50,4 @@ History uses short imperative lowercase subjects, often prefixed with a verb (`u
 
 ## Security Notes
 
-Never commit Jira credentials or Firebase secrets. Jira auth lives in the Worker's secrets (`wrangler secret put`); the browser never sees Atlassian tokens. Add new production origins to `ALLOWED_ORIGINS` in `cloudflare-worker/worker.js` before deploying.
+Never commit Jira credentials or Firebase secrets. Jira auth lives in the Worker's secrets (`wrangler secret put`); the browser never sees Atlassian tokens. Add new production origins to `ALLOWED_ORIGINS` in `cloudflare-worker/worker-dashboard.js` before deploying.

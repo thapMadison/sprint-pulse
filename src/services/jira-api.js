@@ -39,3 +39,9 @@ export async function fetchSprintListFromWorker(workerUrl, boardId) {
 export async function fetchEpicsFromWorker(workerUrl, boardId) {
   return workerGet(workerUrl, `/epics?boardId=${encodeURIComponent(boardId)}`);
 }
+
+// Fetch all child issues of a specific epic with changelog.
+// Used for progressive loading: load detail per epic for accurate dates.
+export async function fetchEpicIssuesFromWorker(workerUrl, epicKey, boardId) {
+  return workerGet(workerUrl, `/epic/${encodeURIComponent(epicKey)}?boardId=${encodeURIComponent(boardId)}`);
+}

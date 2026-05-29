@@ -3,14 +3,14 @@
 import { DEMO_SPRINTS, DEMO_TODAY } from '../data/demo.js';
 import { todayISO } from '../domain/working-days.js';
 import { buildSprintsFromIssues } from '../domain/sprint-builder.js';
-import { buildEpics } from '../domain/epic-builder.js';
+import { buildLightweightEpics, enrichEpicWithDetail } from '../domain/epic-builder.js';
 import { parseFile } from '../data/parsers/index.js';
 import {
   signInWithMicrosoft, signOut, isAuthenticated, getWorkerUrl,
 } from '../services/auth.js';
 import {
   fetchAllFromWorker, fetchSprintFromWorker, fetchSprintListFromWorker,
-  fetchEpicsFromWorker,
+  fetchEpicsFromWorker, fetchEpicIssuesFromWorker,
 } from '../services/jira-api.js';
 import { setState, setStateSilent, getState } from './state.js';
 import { DEMO_EPICS } from '../data/demo.js';
@@ -129,39 +129,44 @@ export function setEpicSearchSilent(value) {
   _epicSearchDebounce = setTimeout(() => setState({}), 220);
 }
 
-// Lazy-load: fetch epic metadata + per-sprint changelogs needed to compute
-// accurate epic start/end dates. Runs only when user enters the Epic tab.
+// Two-phase epic loading for better UX:
+// Phase 1: Render immediately with lightweight epics (fallback dates from sprint boundaries)
+// Phase 2: Progressive load detail per epic for accurate changelog-derived dates
 async function loadEpicsAndChangelogs() {
   const s = getState();
   const source = s.sourceKey;
 
-  // Demo mode: just build from already-present statusChanges + DEMO_EPICS
+  // Demo mode: build from already-present statusChanges + DEMO_EPICS (all detail available)
   if (source === 'demo') {
-    const epics = buildEpics(s.sprints, DEMO_EPICS, s.today);
+    const epics = buildLightweightEpics(s.sprints, DEMO_EPICS, s.today)
+      .map((e) => ({ ...e, detailLoaded: true }));
     setState({
       rawEpics: DEMO_EPICS,
       epics,
       activeEpicId: epics[0]?.id || null,
       expandedEpicIds: new Set(),
       epicError: null,
+      epicLoadProgress: null,
     });
     return;
   }
 
-  // File mode: no API, build from whatever epicKey was parsed. No changelog refine.
+  // File mode: no API available, build from parsed epicKey (all detail we have)
   if (source === 'file') {
-    const epics = buildEpics(s.sprints, [], s.today);
+    const epics = buildLightweightEpics(s.sprints, [], s.today)
+      .map((e) => ({ ...e, detailLoaded: true }));
     setState({
       rawEpics: [],
       epics,
       activeEpicId: epics[0]?.id || null,
       expandedEpicIds: new Set(),
       epicError: null,
+      epicLoadProgress: null,
     });
     return;
   }
 
-  // API mode: fetch /epics + lazy-load changelog for every sprint with tasks.
+  // API mode: two-phase loading
   const workerUrl = await getWorkerUrl();
   if (!workerUrl) {
     setState({ epicError: 'Worker URL not configured.' });
@@ -173,58 +178,62 @@ async function loadEpicsAndChangelogs() {
     return;
   }
 
-  const sprintsToLoad = s.sprints.filter(
-    (sp) => sp.issues.length && (!sp.issues[0].statusChanges || !sp.issues[0].statusChanges.length)
-  );
-  const totalSteps = sprintsToLoad.length + 1; // +1 for /epics
-  let step = 0;
-  const updateProgress = (label) => {
-    step++;
-    setState({
-      epicLoadProgress: {
-        step, total: totalSteps, label,
-        percent: Math.round((step / totalSteps) * 100),
-      },
-    });
-  };
-
   try {
-    setState({
-      epicLoadProgress: { step: 0, total: totalSteps, label: 'Fetching epics…', percent: 0 },
-      epicError: null,
-    });
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 1: Immediate render with lightweight epics
+    // ═══════════════════════════════════════════════════════════════════════
+    setState({ epicError: null, epicLoadProgress: { phase: 1, label: 'Loading epic list…' } });
 
-    // 1. Fetch epic metadata
     let rawEpics = [];
     try {
       rawEpics = await fetchEpicsFromWorker(workerUrl, boardId);
     } catch (e) {
-      // Non-fatal: continue with empty rawEpics, fall back to epicKey as name
       console.warn('[Epic] /epics fetch failed, falling back to derived names:', e);
     }
-    updateProgress('Epics loaded');
 
-    // 2. Lazy-load changelog per sprint (sequential to avoid worker rate limits)
-    for (const sp of sprintsToLoad) {
-      try {
-        await loadSprintChangelog(sp.id);
-      } catch (e) {
-        console.warn(`[Epic] changelog load failed for ${sp.name}:`, e);
-      }
-      updateProgress(`Loaded ${sp.name}`);
-    }
-
-    // 3. Build epics with the now-enriched sprints
-    const latest = getState();
-    const epics = buildEpics(latest.sprints, rawEpics, latest.today);
+    const lightweightEpics = buildLightweightEpics(s.sprints, rawEpics, s.today);
     setState({
       rawEpics,
-      epics,
-      activeEpicId: epics[0]?.id || null,
+      epics: lightweightEpics,
+      activeEpicId: lightweightEpics[0]?.id || null,
       expandedEpicIds: new Set(),
       epicLoadProgress: null,
       epicError: null,
     });
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 2: Progressive detail loading per epic
+    // ═══════════════════════════════════════════════════════════════════════
+    // Prioritize: in-progress epics first, then todo, then done
+    // Skip NO_EPIC (tasks without epic parent) - they don't have a Jira epic key
+    const epicsToLoad = lightweightEpics
+      .filter((e) => !e.isNoEpic && !e.detailLoaded)
+      .sort((a, b) => {
+        const ORDER = { inprogress: 0, todo: 1, done: 2 };
+        return (ORDER[a.status] ?? 3) - (ORDER[b.status] ?? 3);
+      });
+
+    for (const epic of epicsToLoad) {
+      try {
+        const detailData = await fetchEpicIssuesFromWorker(workerUrl, epic.key, boardId);
+        const latest = getState();
+        const enrichedEpic = enrichEpicWithDetail(epic, detailData, latest.today);
+
+        // Update the single epic in the array without re-sorting (preserve order)
+        const updatedEpics = latest.epics.map((e) =>
+          e.id === epic.id ? enrichedEpic : e
+        );
+        setState({ epics: updatedEpics });
+      } catch (e) {
+        console.warn(`[Epic] detail load failed for ${epic.key}:`, e);
+        // Mark as loaded (with error) so UI stops showing spinner
+        const latest = getState();
+        const updatedEpics = latest.epics.map((e) =>
+          e.id === epic.id ? { ...e, detailLoaded: true, detailError: e.message } : e
+        );
+        setState({ epics: updatedEpics });
+      }
+    }
   } catch (e) {
     setState({
       epicLoadProgress: null,

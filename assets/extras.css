@@ -1288,6 +1288,20 @@ html.theme-light {
   color: var(--ink-2);
 }
 .epic-hero-badge .pulse { display: inline-block; width: 6px; height: 6px; }
+.epic-hero-badge.loading {
+  background: oklch(0.82 0.15 75 / 0.12);
+  color: var(--amber);
+  animation: pulse-opacity 1.2s ease-in-out infinite;
+}
+.epic-hero-badges {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.epic-hero.loading .sprint-meta,
+.epic-hero.loading .stat-grid {
+  opacity: 0.6;
+}
 
 /* --- Epic tasks table additions --- */
 .epic-tasks-table .epic-task-summary {
@@ -1560,15 +1574,26 @@ html.theme-light {
   position: absolute;
   top: 0;
   bottom: 0;
-  border-left: 1px dashed oklch(0.6 0.01 270 / 0.5);
 }
 .roadmap-sprint-band.band-a { background: oklch(0.7 0.12 295 / 0.05); }
 .roadmap-sprint-band.band-b { background: oklch(0.7 0.12 200 / 0.05); }
 .roadmap-sprint-band.band-c { background: oklch(0.7 0.12 130 / 0.05); }
 .roadmap-sprint-band.active {
   background: oklch(0.82 0.15 75 / 0.10);
-  border-left: 2px solid var(--amber);
   box-shadow: inset -2px 0 0 0 var(--amber);
+}
+/* Separate divider lines at sprint boundaries */
+.roadmap-sprint-divider {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px dashed oklch(0.6 0.01 270 / 0.5);
+  pointer-events: none;
+  z-index: 1;
+}
+.roadmap-sprint-divider.active {
+  border-left: 2px solid var(--amber);
 }
 .roadmap-sprint-band.future {
   background: oklch(0.5 0.01 270 / 0.04);
@@ -1789,6 +1814,7 @@ html.theme-light {
   overflow: hidden;
   border: 1px solid transparent;
   background: oklch(0.5 0.01 270 / 0.15);
+  min-width: 4px;
 }
 .theme-light .roadmap-bar.epic { background: oklch(0.2 0.01 270 / 0.08); }
 .roadmap-bar.epic.done {
@@ -1836,6 +1862,9 @@ html.theme-light {
 .roadmap-bar.task {
   height: 12px;
   font-size: 0;
+  /* Pixel floor keeps 1-day bars visible without inflating their apparent
+     duration on long timelines (a %-based floor scaled wrong as range grew). */
+  min-width: 3px;
 }
 .roadmap-bar.task.done { background: var(--lime); opacity: 0.85; }
 .roadmap-bar.task.inprogress { background: var(--amber); opacity: 0.9; }
@@ -1859,6 +1888,59 @@ html.theme-light {
   font: italic 500 11px var(--font-mono);
   color: var(--ink-3);
 }
+.roadmap-bar-empty.loading {
+  color: var(--ink-4);
+  animation: pulse-opacity 1.2s ease-in-out infinite;
+}
+
+/* ===== Loading states for progressive epic detail loading ===== */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes pulse-opacity {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.roadmap-bar.epic.loading {
+  position: relative;
+  overflow: hidden;
+}
+.roadmap-bar.epic.loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(1 0 0 / 0.08) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  pointer-events: none;
+}
+.theme-light .roadmap-bar.epic.loading::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    oklch(0.5 0 0 / 0.1) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+}
+
+.roadmap-progress.loading {
+  opacity: 0.7;
+}
+.roadmap-loading-dot {
+  color: var(--amber);
+  font-weight: 700;
+  animation: pulse-opacity 0.8s ease-in-out infinite;
+  margin-left: 2px;
+}
+
 .roadmap-task-dot {
   position: absolute;
   top: 50%;

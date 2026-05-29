@@ -47,12 +47,15 @@ function lastDoneDate(task) {
 }
 
 // Fallback when no changelog: derive from current status + sprint dates.
+// Status can be a string ('todo') or object ({name, statusCategory}).
 function fallbackStarted(task, sprint) {
-  if (task.status === 'todo') return null;
+  const status = typeof task.status === 'string' ? task.status : normalizeStatus(task.status);
+  if (status === 'todo') return null;
   return sprint?.startDate || null;
 }
 function fallbackDone(task, sprint) {
-  if (task.status !== 'done') return null;
+  const status = typeof task.status === 'string' ? task.status : normalizeStatus(task.status);
+  if (status !== 'done') return null;
   return sprint?.endDate || null;
 }
 
@@ -194,4 +197,102 @@ export function buildEpics(sprints, rawEpics, today) {
   });
 
   return epics;
+}
+
+// Phase 1: Build lightweight epics using only existing /all data (no changelog).
+// Uses fallback dates from sprint boundaries. Sets detailLoaded: false so UI
+// can show loading indicator per epic.
+export function buildLightweightEpics(sprints, rawEpics, today) {
+  const epics = buildEpics(sprints, rawEpics, today);
+  return epics.map((e) => ({ ...e, detailLoaded: e.isNoEpic }));
+}
+
+// Phase 2: Enrich a single epic with detailed issue data (with changelog).
+// Returns a new epic object with accurate startedDate/doneDate per task.
+export function enrichEpicWithDetail(epic, detailData, today) {
+  if (!detailData || !detailData.issues) return { ...epic, detailLoaded: true };
+
+  const tasks = detailData.issues.map((iss) => {
+    const status = normalizeStatus(iss.status);
+    return {
+      key: iss.key,
+      summary: iss.summary,
+      type: iss.type,
+      priority: iss.priority,
+      status,
+      statusName: iss.status?.name || status,
+      assigneeName: iss.assigneeName,
+      assigneeId: iss.assigneeId,
+      originalEstimate: iss.originalEstimate,
+      timeSpent: iss.timeSpent,
+      remainingEstimate: iss.remainingEstimate,
+      sprintId: iss.sprintId,
+      sprintName: iss.sprintName,
+      sprintStartDate: iss.sprintStartDate,
+      sprintEndDate: iss.sprintEndDate,
+      epicKey: iss.epicKey,
+      epicName: iss.epicName,
+      statusChanges: iss.statusChanges || [],
+      startedDate: firstStartedDate(iss) || fallbackStarted(iss, {
+        startDate: iss.sprintStartDate,
+        endDate: iss.sprintEndDate,
+      }),
+      doneDate: lastDoneDate(iss) || fallbackDone(iss, {
+        startDate: iss.sprintStartDate,
+        endDate: iss.sprintEndDate,
+      }),
+    };
+  });
+
+  const epicStatus = deriveEpicStatus(tasks);
+  const totalIssues = tasks.length;
+  const doneIssues = tasks.filter((t) => t.status === 'done').length;
+  const totalHours = tasks.reduce((s, t) => s + (t.originalEstimate || 0), 0);
+  const doneHours = tasks
+    .filter((t) => t.status === 'done')
+    .reduce((s, t) => s + (t.originalEstimate || 0), 0);
+  const percent = totalHours > 0
+    ? Math.round((doneHours / totalHours) * 100)
+    : totalIssues > 0
+      ? Math.round((doneIssues / totalIssues) * 100)
+      : 0;
+
+  let startDate = null;
+  let endDate = null;
+  for (const t of tasks) {
+    if (t.startedDate) startDate = minDate(startDate, t.startedDate);
+    if (t.doneDate) endDate = maxDate(endDate, t.doneDate);
+  }
+  if (epicStatus !== 'done') endDate = null;
+
+  const sprintIds = Array.from(new Set(tasks.map((t) => t.sprintId).filter(Boolean)));
+
+  return {
+    ...epic,
+    name: detailData.epic?.name || epic.name,
+    summary: detailData.epic?.name || epic.summary,
+    status: epicStatus,
+    statusName: detailData.epic?.status?.name || epic.statusName,
+    tasks,
+    sprintIds,
+    startDate,
+    endDate,
+    today,
+    progress: {
+      totalIssues, doneIssues,
+      totalHours, doneHours,
+      percent,
+      counts: {
+        todo: tasks.filter((t) => t.status === 'todo').length,
+        inprogress: tasks.filter((t) => t.status === 'inprogress').length,
+        done: doneIssues,
+      },
+      hours: {
+        todo: tasks.filter((t) => t.status === 'todo').reduce((s, t) => s + (t.originalEstimate || 0), 0),
+        inprogress: tasks.filter((t) => t.status === 'inprogress').reduce((s, t) => s + (t.originalEstimate || 0), 0),
+        done: doneHours,
+      },
+    },
+    detailLoaded: true,
+  };
 }

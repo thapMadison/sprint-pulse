@@ -64,7 +64,7 @@ After deployment, you'll get a URL like `https://jira-proxy.<subdomain>.workers.
    const PROXY_URL = 'https://jira-proxy.your-subdomain.workers.dev';
    ```
 
-**Add your production domain** to `ALLOWED_ORIGINS` in `cloudflare-worker/worker.js` before deploying to production.
+**Add your production domain** to `ALLOWED_ORIGINS` in `cloudflare-worker/worker-dashboard.js` before deploying to production.
 
 3. **Import CSV / XML / JSON file** — point at an export from Jira:
    - **CSV**: Jira → `Filters` → run a JQL search → `Export Excel CSV (current fields)`. The parser understands the standard column set: `Issue key`, `Summary`, `Status`, `Status Category`, `Priority`, `Assignee`, `Sprint`, `Σ Original Estimate` / `Original Estimate`, `Σ Time Spent`, `Σ Remaining Estimate`, plus Issue Type. Time columns may be either seconds or strings like `1d 4h`.

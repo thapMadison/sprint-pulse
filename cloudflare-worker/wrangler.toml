@@ -1,5 +1,5 @@
 name = "jira-proxy"
-main = "worker.js"
+main = "worker-dashboard.js"
 compatibility_date = "2024-01-01"
 
 # Free tier works fine for this use case
