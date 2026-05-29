@@ -10,6 +10,7 @@
 // Output: Array of Epic objects (see schema below).
 
 import { normalizeStatus } from './status.js';
+import { makeUserPool } from './sprint-builder.js';
 
 export const NO_EPIC_ID = '__NO_EPIC__';
 
@@ -212,6 +213,7 @@ export function buildLightweightEpics(sprints, rawEpics, today) {
 export function enrichEpicWithDetail(epic, detailData, today) {
   if (!detailData || !detailData.issues) return { ...epic, detailLoaded: true };
 
+  const userFor = makeUserPool();
   const tasks = detailData.issues.map((iss) => {
     const status = normalizeStatus(iss.status);
     return {
@@ -221,6 +223,7 @@ export function enrichEpicWithDetail(epic, detailData, today) {
       priority: iss.priority,
       status,
       statusName: iss.status?.name || status,
+      assignee: userFor(iss.assigneeName, iss.assigneeId),
       assigneeName: iss.assigneeName,
       assigneeId: iss.assigneeId,
       originalEstimate: iss.originalEstimate,

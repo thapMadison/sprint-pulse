@@ -32,6 +32,12 @@ export function renderEpicDetailPanel({ epic, today, onClose }) {
     onClick: onClose,
   }, ['×']);
 
+  // The hero is a 3-column grid (meta card | stat tiles | …); the epic hero
+  // only fills the first two, so drop the donut into the 3rd column — same as
+  // the sprint view — instead of leaving it in a half-empty side column.
+  const hero = renderEpicHero({ epic, today });
+  hero.appendChild(donutCard(epic));
+
   const panel = el('aside', {
     class: 'epic-detail-panel',
     role: 'dialog',
@@ -39,8 +45,7 @@ export function renderEpicDetailPanel({ epic, today, onClose }) {
   }, [
     closeBtn,
     el('div', { class: 'epic-detail-body' }, [
-      renderEpicHero({ epic, today }),
-      donutCard(epic),
+      hero,
       renderEpicTasksTable({ epic }),
     ]),
   ]);

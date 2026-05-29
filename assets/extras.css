@@ -24,6 +24,10 @@ html.theme-light {
   border-radius: 14px;
   backdrop-filter: blur(20px);
   flex-wrap: wrap;
+  /* Lift the whole bar (and its floating recent-boards dropdown) above the
+     sprint content that follows it in the DOM, so the dropdown isn't covered. */
+  position: relative;
+  z-index: 40;
 }
 .data-source-bar .ds-label {
   font-family: var(--font-mono);
@@ -88,8 +92,18 @@ html.theme-light {
     inset 0 1px 0 oklch(1 0 0 / 0.35);
   filter: brightness(1.12) saturate(1.1);
 }
-.data-source-bar .ds-status {
+.data-source-bar .ds-trailing {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.data-source-bar .ds-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--border);
+}
+.data-source-bar .ds-status {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--ink-3);
@@ -611,6 +625,112 @@ html.theme-light {
   to { opacity: 1; transform: translateX(0); }
 }
 
+/* Recent boards quick-switch — a chevron toggle + floating dropdown anchored to
+   the Board ID field. The dropdown is position:absolute so it overlays the
+   content below instead of adding a second row, keeping the bar height fixed
+   (no screen jump when opening the panel or switching sources). */
+.recent-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-left: -4px;
+  border: 1px solid var(--cyan);
+  border-radius: 8px;
+  background: oklch(0.7 0.15 220 / 0.14);
+  color: var(--cyan);
+  font-size: 21px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s, border-color 0.18s, transform 0.18s, box-shadow 0.18s;
+}
+.recent-toggle:hover {
+  background: oklch(0.7 0.15 220 / 0.26);
+  box-shadow: 0 0 0 3px oklch(0.7 0.15 220 / 0.15);
+}
+.inline-board-field:has(.board-recent-dropdown.open) .recent-toggle {
+  transform: rotate(180deg);
+  background: linear-gradient(135deg, var(--violet), var(--cyan));
+  color: white;
+  border-color: transparent;
+}
+.theme-light .recent-toggle {
+  background: oklch(0.7 0.15 220 / 0.12);
+}
+
+.board-recent-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  min-width: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+}
+.board-recent-dropdown.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.board-recent-head {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 4px 8px 6px;
+}
+.board-recent-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-2);
+  font-family: var(--font-body);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.board-recent-item:hover {
+  background: oklch(1 0 0 / 0.08);
+  color: var(--ink);
+}
+.board-recent-name {
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.board-recent-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.theme-light .board-recent-dropdown {
+  background: oklch(1 0 0 / 0.96);
+}
+.theme-light .board-recent-item:hover {
+  background: oklch(0 0 0 / 0.05);
+}
+
 /* === Chart Info Tooltip === */
 .chart-info-wrap {
   position: relative;
@@ -624,8 +744,8 @@ html.theme-light {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 25px;
+  height: 25px;
   padding: 0;
   background: var(--accent-gradient);
   border: none;
@@ -898,9 +1018,13 @@ html.theme-light {
 .progress-strip-head {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
-  flex-shrink: 0;
-  min-width: 0;
+  /* Fixed width with the content right-aligned: the spinner/label/percent stay
+     grouped right next to the bar, so the bar keeps a constant length AND the
+     percent never drifts away from the label. Any slack from a short label
+     ("Done") collapses to the left, into the bar's empty space. */
+  flex: 0 0 210px;
 }
 .progress-spinner {
   width: 14px;
@@ -919,7 +1043,9 @@ html.theme-light {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+  /* Content-sized so it sits right beside the percent; capped so a long label
+     can't overflow the fixed-width head (it ellipsizes instead). */
+  max-width: 140px;
 }
 .progress-percent {
   font-family: var(--font-mono);
@@ -1278,8 +1404,8 @@ html.theme-light {
   border-radius: 999px;
 }
 .epic-hero-badge.inprogress {
-  background: oklch(0.82 0.15 75 / 0.18);
-  color: var(--amber);
+  background: oklch(0.82 0.15 75 / 0.24);
+  color: oklch(0.64 0.16 68);
 }
 .epic-hero-badge.inprogress .pulse {
   width: 6px;
@@ -1290,8 +1416,8 @@ html.theme-light {
   animation: progress-pulse 1.4s ease-in-out infinite;
 }
 .epic-hero-badge.done {
-  background: oklch(0.84 0.18 130 / 0.18);
-  color: var(--lime);
+  background: oklch(0.84 0.18 130 / 0.24);
+  color: oklch(0.62 0.18 138);
 }
 .epic-hero-badge.todo {
   background: oklch(0.5 0.01 270 / 0.15);
@@ -1695,19 +1821,36 @@ html.theme-light {
   align-items: flex-start;
 }
 .roadmap-chevron-btn {
-  border: 0;
-  background: transparent;
+  border: 1px solid color-mix(in oklch, var(--ink) 20%, transparent);
+  background: color-mix(in oklch, var(--ink) 6%, transparent);
   cursor: pointer;
-  padding: 2px 4px;
-  color: var(--ink-3);
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--ink-2);
   display: flex;
   align-items: center;
-  margin-top: 2px;
+  justify-content: center;
+  margin-top: 1px;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
-.roadmap-chevron-btn:hover { color: var(--ink); }
+.roadmap-chevron-btn:hover {
+  background: color-mix(in oklch, var(--ink) 12%, transparent);
+  border-color: color-mix(in oklch, var(--ink) 38%, transparent);
+  color: var(--ink);
+}
+.roadmap-chevron-btn:active { transform: scale(0.92); }
+.roadmap-chevron-btn.open {
+  background: color-mix(in oklch, var(--ink) 14%, transparent);
+  border-color: color-mix(in oklch, var(--ink) 32%, transparent);
+  color: var(--ink);
+}
 .roadmap-chevron {
   display: inline-block;
-  font-size: 10px;
+  font-size: 16px;
+  line-height: 1;
   transition: transform 0.18s ease;
 }
 .roadmap-chevron.open { transform: rotate(90deg); }
@@ -1755,12 +1898,12 @@ html.theme-light {
   color: var(--ink-2);
 }
 .roadmap-status-pill.inprogress {
-  background: oklch(0.82 0.15 75 / 0.18);
-  color: var(--amber);
+  background: oklch(0.82 0.15 75 / 0.24);
+  color: oklch(0.64 0.16 68);
 }
 .roadmap-status-pill.done {
-  background: oklch(0.84 0.18 130 / 0.18);
-  color: var(--lime);
+  background: oklch(0.84 0.18 130 / 0.24);
+  color: oklch(0.62 0.18 138);
 }
 .roadmap-status-pill.loose {
   background: oklch(0.5 0.01 270 / 0.12);
@@ -2137,7 +2280,7 @@ html.theme-light {
   top: 0;
   right: 0;
   bottom: 0;
-  width: min(720px, 92vw);
+  width: min(1300px, 97vw);
   background: var(--bg-card, oklch(0.16 0.01 270));
   border-left: 1px solid var(--border-strong);
   box-shadow: -20px 0 60px -10px oklch(0 0 0 / 0.5);

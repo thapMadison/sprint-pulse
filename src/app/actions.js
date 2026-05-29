@@ -8,14 +8,80 @@ import { parseFile } from '../data/parsers/index.js';
 import {
   signInWithMicrosoft, signOut, isAuthenticated, getWorkerUrl,
 } from '../services/auth.js';
+import * as cache from '../services/data-cache.js';
 import {
   fetchSprintFromWorker, fetchSprintListFromWorker, fetchBoardFromWorker,
   fetchEpicsFromWorker, fetchEpicIssuesFromWorker,
 } from '../services/jira-api.js';
-import { setState, setStateSilent, getState } from './state.js';
+import { setState, setStateSilent, setEpicRoadmapState, setEpicViewState, setSprintViewState, setLoadProgressState, setDataSourceState, getState } from './state.js';
 import { DEMO_EPICS } from '../data/demo.js';
 
 const BOARD_ID_KEY = 'jira_board_id';
+
+// ─────────────────────────── data-source cache ───────────────────────────
+// Snapshot/restore the data-bearing slice of state per source so switching
+// sources (or refreshing the page) doesn't re-fetch what's already loaded.
+// UI-only state (Set of expanded ids, open detail/panel, filters) is rebuilt
+// fresh on restore and deliberately not cached.
+
+function sourceDescriptor() {
+  const s = getState();
+  return { sourceKey: s.sourceKey, sourceId: s.sourceId, uid: cache.userScope() };
+}
+
+function snapshotData(s) {
+  return {
+    sourceKey: s.sourceKey,
+    sourceId: s.sourceId,
+    sourceLabel: s.sourceLabel,
+    sprints: s.sprints,
+    activeSprintId: s.activeSprintId,
+    today: s.today,
+    rawEpics: s.rawEpics,
+    epics: s.epics,
+    lastUpdated: s.lastUpdated,
+  };
+}
+
+// Persist whatever source is active right now (memory + IndexedDB, debounced),
+// and record it as the "last source" so the next page load can restore it.
+// Demo carries no data — only its pointer is written.
+function persistCurrent() {
+  const desc = sourceDescriptor();
+  cache.setLastSource(desc);
+  const key = cache.cacheKeyFor(desc);
+  if (!key || key === 'demo') return;
+  cache.putCached({ key, ...snapshotData(getState()), updatedAt: Date.now() });
+}
+
+// Load a cached snapshot into state. Resets UI-only state to a clean default
+// (same fields applyLoadedSprints clears) and repaints the whole page so the
+// source bar, tabs and content all reflect the restored source.
+function restoreSnapshot(snap, extra = {}) {
+  setState({
+    sprints: snap.sprints,
+    activeSprintId: snap.activeSprintId,
+    today: snap.today,
+    sourceKey: snap.sourceKey,
+    sourceId: snap.sourceId,
+    sourceLabel: snap.sourceLabel,
+    lastUpdated: snap.lastUpdated || null,
+    rawEpics: snap.rawEpics || [],
+    epics: snap.epics || [],
+    error: null,
+    isRefreshing: false,
+    epicLoadProgress: null,
+    epicError: null,
+    activeEpicId: (snap.epics && snap.epics[0]?.id) || null,
+    expandedEpicIds: new Set(),
+    epicDetailId: null,
+    epicFilters: { status: 'all', sprintId: 'all', search: '' },
+    ...extra,
+  });
+  // Only rebuild epics if none were cached — otherwise we'd discard the cached
+  // (already-enriched) epics with a fresh fetch. Use Refresh to pull anew.
+  if (!(snap.epics && snap.epics.length)) reloadEpicsIfActive();
+}
 
 // Prefer the human-readable board name; fall back to the numeric id.
 function apiSourceLabel(board, boardId) {
@@ -32,7 +98,9 @@ function pickInitialSprintId(sprints) {
 }
 
 export function setActiveSprint(id) {
-  setState({ activeSprintId: id });
+  // Switching tabs only affects the sprint content area — repaint just that
+  // (filter highlight + charts/skeleton) instead of re-rendering the whole page.
+  setSprintViewState({ activeSprintId: id });
   // Lazy-load this sprint's issues + changelog the first time it's viewed.
   if (getState().sourceKey === 'api') {
     loadSprintDetail(id).catch((e) => {
@@ -46,7 +114,7 @@ function markSprintLoaded(sprintId, error) {
   const updated = latest.sprints.map((sp) =>
     sp.id === sprintId ? { ...sp, issuesLoaded: true, issuesError: error || null } : sp
   );
-  setState({ sprints: updated });
+  setSprintViewState({ sprints: updated });
 }
 
 // Fetch a single sprint's issues (with changelog) on demand and merge into state.
@@ -77,14 +145,20 @@ async function loadSprintDetail(sprintId) {
     const updated = latest.sprints.map((sp) =>
       sp.id === sprintId ? populateSprintIssues({ ...sp, jiraId }, data.issues || []) : sp
     );
-    setState({ sprints: updated });
+    setSprintViewState({ sprints: updated });
+    // Cache the newly-loaded issues so re-selecting this sprint (or a page
+    // refresh) doesn't re-fetch them.
+    persistCurrent();
   } catch (e) {
     markSprintLoaded(sprintId, e.message || String(e));
   }
 }
 
 export function setApiPanelOpen(open) {
-  setState({ apiPanelOpen: open });
+  // Toggling the inline Board ID panel only affects the data-source bar — repaint
+  // just that region instead of re-rendering the whole page (avoids the
+  // background flash and redrawing every chart for a single click).
+  setDataSourceState({ apiPanelOpen: open });
 }
 
 export function setView(view) {
@@ -105,29 +179,30 @@ export function toggleEpicExpanded(id) {
   const next = new Set(getState().expandedEpicIds);
   if (next.has(id)) next.delete(id);
   else next.add(id);
-  setState({ expandedEpicIds: next });
+  // Repaint only the Epic view, not the whole page (avoids the background flash).
+  setEpicViewState({ expandedEpicIds: next });
 }
 
 export function openEpicDetail(id) {
-  setState({ epicDetailId: id });
+  setEpicViewState({ epicDetailId: id });
 }
 
 export function closeEpicDetail() {
-  setState({ epicDetailId: null });
+  setEpicViewState({ epicDetailId: null });
 }
 
 export function setEpicFilter(patch) {
-  setState({ epicFilters: { ...getState().epicFilters, ...patch } });
+  setEpicViewState({ epicFilters: { ...getState().epicFilters, ...patch } });
 }
 
-// Update search text silently then schedule a debounced re-render so the
-// roadmap actually filters while the user keeps typing without losing focus.
+// Update search text silently then schedule a debounced repaint so the roadmap
+// actually filters while the user keeps typing without losing focus.
 let _epicSearchDebounce = null;
 export function setEpicSearchSilent(value) {
   const s = getState();
   setStateSilent({ epicFilters: { ...s.epicFilters, search: value } });
   if (_epicSearchDebounce) clearTimeout(_epicSearchDebounce);
-  _epicSearchDebounce = setTimeout(() => setState({}), 220);
+  _epicSearchDebounce = setTimeout(() => setEpicViewState({}), 220);
 }
 
 // Two-phase epic loading for better UX:
@@ -141,7 +216,7 @@ async function loadEpicsAndChangelogs() {
   if (source === 'demo') {
     const epics = buildLightweightEpics(s.sprints, DEMO_EPICS, s.today)
       .map((e) => ({ ...e, detailLoaded: true }));
-    setState({
+    setEpicViewState({
       rawEpics: DEMO_EPICS,
       epics,
       activeEpicId: epics[0]?.id || null,
@@ -156,7 +231,7 @@ async function loadEpicsAndChangelogs() {
   if (source === 'file') {
     const epics = buildLightweightEpics(s.sprints, [], s.today)
       .map((e) => ({ ...e, detailLoaded: true }));
-    setState({
+    setEpicViewState({
       rawEpics: [],
       epics,
       activeEpicId: epics[0]?.id || null,
@@ -164,18 +239,19 @@ async function loadEpicsAndChangelogs() {
       epicError: null,
       epicLoadProgress: null,
     });
+    persistCurrent();
     return;
   }
 
   // API mode: two-phase loading
   const workerUrl = await getWorkerUrl();
   if (!workerUrl) {
-    setState({ epicError: 'Worker URL not configured.' });
+    setEpicViewState({ epicError: 'Worker URL not configured.' });
     return;
   }
   const boardId = localStorage.getItem(BOARD_ID_KEY);
   if (!boardId) {
-    setState({ epicError: 'Board ID not set.' });
+    setEpicViewState({ epicError: 'Board ID not set.' });
     return;
   }
 
@@ -183,7 +259,7 @@ async function loadEpicsAndChangelogs() {
     // ═══════════════════════════════════════════════════════════════════════
     // PHASE 1: Immediate render with lightweight epics
     // ═══════════════════════════════════════════════════════════════════════
-    setState({ epicError: null, epicLoadProgress: { phase: 1, label: 'Loading epic list…' } });
+    setEpicViewState({ epicError: null, epicLoadProgress: { phase: 1, label: 'Loading epic list…' } });
 
     let rawEpics = [];
     try {
@@ -193,7 +269,7 @@ async function loadEpicsAndChangelogs() {
     }
 
     const lightweightEpics = buildLightweightEpics(s.sprints, rawEpics, s.today);
-    setState({
+    setEpicViewState({
       rawEpics,
       epics: lightweightEpics,
       activeEpicId: lightweightEpics[0]?.id || null,
@@ -220,11 +296,18 @@ async function loadEpicsAndChangelogs() {
         const latest = getState();
         const enrichedEpic = enrichEpicWithDetail(epic, detailData, latest.today);
 
-        // Update the single epic in the array without re-sorting (preserve order)
+        // Update the single epic in the array without re-sorting (preserve order).
+        // Repaint only the roadmap node so the rest of the page doesn't jank —
+        // unless this epic's detail panel is open, in which case repaint the
+        // whole Epic view (filter bar + roadmap + panel), still not the page.
         const updatedEpics = latest.epics.map((e) =>
           e.id === epic.id ? enrichedEpic : e
         );
-        setState({ epics: updatedEpics });
+        if (latest.epicDetailId === epic.id) {
+          setEpicViewState({ epics: updatedEpics });
+        } else {
+          setEpicRoadmapState({ epics: updatedEpics });
+        }
       } catch (e) {
         console.warn(`[Epic] detail load failed for ${epic.key}:`, e);
         // Mark as loaded (with error) so UI stops showing spinner
@@ -232,11 +315,13 @@ async function loadEpicsAndChangelogs() {
         const updatedEpics = latest.epics.map((e) =>
           e.id === epic.id ? { ...e, detailLoaded: true, detailError: e.message } : e
         );
-        setState({ epics: updatedEpics });
+        setEpicRoadmapState({ epics: updatedEpics });
       }
+      // Keep the cached snapshot in step with the enriched epics (debounced).
+      persistCurrent();
     }
   } catch (e) {
-    setState({
+    setEpicViewState({
       epicLoadProgress: null,
       epicError: e.message || String(e),
     });
@@ -273,12 +358,16 @@ const LOAD_STEPS = {
 
 function setProgress(step, flow) {
   if (!step) {
+    // Removing the bar changes page layout — needs a full render.
     setState({ loadProgress: null });
     return;
   }
   const meta = LOAD_STEPS[step];
   const prevFlow = getState().loadProgress?.flow;
-  setState({
+  // Route through the load-progress channel so an already-mounted strip is
+  // updated in place (smooth width transition) rather than rebuilt; the very
+  // first step falls back to a full render to create the bar.
+  setLoadProgressState({
     loadProgress: {
       step, label: meta.label, percent: meta.percent,
       flow: flow || prevFlow || 'api',
@@ -311,14 +400,20 @@ export async function login() {
 
 export async function logout() {
   try {
+    // Capture the uid before sign-out so we can wipe that user's cached Jira/
+    // file data — it must not linger for the next person on a shared machine.
+    const uid = cache.userScope();
     await signOut();
     localStorage.removeItem(BOARD_ID_KEY);
+    await cache.clearUser(uid);
+    cache.clearLastSource();
     setState({
       user: null,
       sprints: DEMO_SPRINTS,
       activeSprintId: 'sp-24',
       today: DEMO_TODAY,
       sourceKey: 'demo',
+      sourceId: null,
       sourceLabel: 'Demo · synced',
       lastUpdated: null,
       error: null,
@@ -342,11 +437,14 @@ export async function logout() {
 }
 
 export function loadDemo() {
+  // Preserve the source we're leaving so switching back to it is instant.
+  persistCurrent();
   setState({
     sprints: DEMO_SPRINTS,
     activeSprintId: 'sp-24',
     today: DEMO_TODAY,
     sourceKey: 'demo',
+    sourceId: null,
     sourceLabel: 'Demo · synced',
     lastUpdated: null,
     error: null,
@@ -358,17 +456,26 @@ export function loadDemo() {
     epicLoadProgress: null,
     epicError: null,
   });
+  // Record demo as the active source (pointer only — demo carries no data).
+  cache.setLastSource(sourceDescriptor());
   reloadEpicsIfActive();
 }
 
 export async function loadFromFile(file) {
   try {
+    // Preserve the source we're leaving so switching back to it is instant.
+    persistCurrent();
     setProgress('parse', 'file');
     const rawIssues = await parseFile(file);
     if (!rawIssues.length) throw new Error('File parsed but contained no issues.');
     setProgress('process');
     const sprints = buildSprintsFromIssues(rawIssues, getState().today);
-    applyLoadedSprints(sprints, `File · ${file.name}`, 'file');
+    // Close the Jira board panel if it was left open — otherwise the Board ID
+    // input lingers and both "Connect with Jira" and "Import" show as active.
+    // A freshly imported file is always re-parsed (it may have changed on disk);
+    // the cache write below is only used to restore it after a page refresh.
+    applyLoadedSprints(sprints, `File · ${file.name}`, 'file', { apiPanelOpen: false, sourceId: file.name });
+    persistCurrent();
     await finishProgress();
     reloadEpicsIfActive();
   } catch (e) {
@@ -382,6 +489,23 @@ export async function loadFromApi(boardId) {
     showError('Please enter your Jira Board ID.');
     return false;
   }
+  // Preserve the source we're leaving (e.g. another board) before switching.
+  persistCurrent();
+
+  // If this board was already loaded this session (or on a previous visit),
+  // restore it instantly and skip every network round-trip. Use Refresh to pull
+  // fresh data.
+  const cacheKey = cache.cacheKeyFor({ sourceKey: 'api', sourceId: boardId, uid: cache.userScope() });
+  if (cacheKey) {
+    const snap = await cache.getCached(cacheKey);
+    if (snap && snap.sprints && snap.sprints.length) {
+      localStorage.setItem(BOARD_ID_KEY, boardId);
+      restoreSnapshot(snap, { apiPanelOpen: false });
+      cache.setLastSource(sourceDescriptor());
+      return true;
+    }
+  }
+
   try {
     setProgress('connect', 'api');
     const workerUrl = await getWorkerUrl();
@@ -401,9 +525,10 @@ export async function loadFromApi(boardId) {
 
     setProgress('process');
     const sprints = buildSprintShells(rawSprints, getState().today);
-    applyLoadedSprints(sprints, apiSourceLabel(board, boardId), 'api', { apiPanelOpen: false });
+    applyLoadedSprints(sprints, apiSourceLabel(board, boardId), 'api', { apiPanelOpen: false, sourceId: boardId });
     // Step 2: load only the default (active) sprint's issues for the first paint.
     await loadSprintDetail(getState().activeSprintId);
+    persistCurrent();
     await finishProgress();
     reloadEpicsIfActive();
     return true;
@@ -443,12 +568,13 @@ export async function refreshFromApi() {
     setProgress('process');
     const prevActive = getState().activeSprintId;
     const sprints = buildSprintShells(rawSprints, getState().today);
-    applyLoadedSprints(sprints, apiSourceLabel(board, boardId), 'api');
+    applyLoadedSprints(sprints, apiSourceLabel(board, boardId), 'api', { sourceId: boardId });
     // Keep the user on the sprint they were viewing if it still exists.
     if (sprints.some((sp) => sp.id === prevActive)) {
       setStateSilent({ activeSprintId: prevActive });
     }
     await loadSprintDetail(getState().activeSprintId);
+    persistCurrent();
     await finishProgress();
     reloadEpicsIfActive();
   } catch (e) {
@@ -458,11 +584,18 @@ export async function refreshFromApi() {
 }
 
 function applyLoadedSprints(sprints, sourceLabel, sourceKey, extra = {}) {
-  setState({
+  // This always runs while the load progress strip is on screen (api / refresh
+  // / file flows). Routing through the sprint-view channel repaints ONLY the
+  // sprint content area with the new data and leaves the data-source bar — and
+  // its animating progress strip — untouched, so the bar doesn't get recreated
+  // mid-load (which killed its width transition and restarted the spinner). The
+  // single full render happens later when finishProgress clears the strip.
+  setSprintViewState({
     sprints,
     activeSprintId: pickInitialSprintId(sprints),
     today: todayISO(),
     sourceKey,
+    sourceId: null, // overridden via `extra` for api (board id) / file (name)
     sourceLabel,
     lastUpdated: new Date(),
     error: null,
@@ -482,4 +615,43 @@ function applyLoadedSprints(sprints, sourceLabel, sourceKey, extra = {}) {
 
 export function getSavedBoardId() {
   return localStorage.getItem(BOARD_ID_KEY) || '';
+}
+
+// Boards this user has cached, most-recent first — powers the quick-switch chips
+// in the Jira panel. Empty when logged out.
+export function getRecentBoards() {
+  return cache.listBoards(cache.userScope());
+}
+
+// On page load, restore the source the user was last on instead of defaulting to
+// demo. Called from each auth-state change until it succeeds once:
+//   • demo / no pointer → nothing to do (demo is already showing).
+//   • api/file pointer → needs the matching signed-in user; if auth hasn't
+//     resolved yet we wait (don't consume the one-shot) for a later callback.
+let _bootRestoreDone = false;
+export async function restoreLastSource(user) {
+  if (_bootRestoreDone) return;
+
+  const pointer = cache.getLastSource();
+  if (!pointer || pointer.sourceKey === 'demo') { _bootRestoreDone = true; return; }
+
+  // api/file data is namespaced per user — only restore for its owner.
+  if (!user) return; // auth still resolving; wait for the next callback
+  if (pointer.uid !== user.uid) { _bootRestoreDone = true; return; }
+
+  _bootRestoreDone = true;
+  const key = cache.cacheKeyFor({ sourceKey: pointer.sourceKey, sourceId: pointer.sourceId, uid: user.uid });
+  const snap = await cache.getCached(key);
+  if (!snap || !snap.sprints || !snap.sprints.length) return;
+
+  if (pointer.sourceKey === 'api' && pointer.sourceId) {
+    localStorage.setItem(BOARD_ID_KEY, pointer.sourceId);
+  }
+  restoreSnapshot(snap);
+}
+
+// Force pending cache writes to disk — call when the tab is hidden/unloaded so
+// lazily-loaded data isn't lost before the debounced write fires.
+export function flushCache() {
+  cache.flush();
 }

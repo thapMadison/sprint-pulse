@@ -251,7 +251,7 @@ function todayMarker(today, dayToPct) {
 function epicRow({ epic, expanded, dayToPct, today, onToggle, onOpenDetail }) {
   const left = el('div', { class: 'roadmap-row-left epic-left' }, [
     el('button', {
-      class: 'roadmap-chevron-btn',
+      class: `roadmap-chevron-btn ${expanded ? 'open' : ''}`,
       type: 'button',
       'aria-label': expanded ? 'Collapse' : 'Expand',
       onClick: () => onToggle(epic.id),

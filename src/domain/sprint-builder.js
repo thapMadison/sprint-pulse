@@ -19,7 +19,7 @@ function initialsOf(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function makeUserPool() {
+export function makeUserPool() {
   const map = new Map();
   let colorIdx = 0;
   return (name, id) => {

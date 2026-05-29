@@ -11,6 +11,7 @@ import { renderWorkloadTable } from '../ui/components/workload-table.js';
 import { renderViewTabs } from '../ui/components/view-tabs.js';
 import { renderEpicFilterBar } from '../ui/components/epic-filter-bar.js';
 import { renderEpicDetailPanel } from '../ui/components/epic-detail-panel.js';
+import { updateProgressOverlay } from '../ui/components/progress-overlay.js';
 
 import { renderBurndown } from '../charts/burndown.js';
 import { renderBurnup } from '../charts/burnup.js';
@@ -248,6 +249,99 @@ function renderEpicLoadingBanner(progress) {
   ]);
 }
 
+// Build the Sprint view content (filter tabs + skeleton or hero/charts/table).
+// Returns an array of nodes so it can mount inside a single container that we
+// can repaint in isolation as a sprint's issues stream in.
+function buildSprintView(s) {
+  const out = [];
+  const sprint = activeSprint();
+
+  out.push(renderSprintFilter({
+    sprints: s.sprints,
+    activeId: s.activeSprintId,
+    onChange: setActiveSprint,
+  }));
+
+  // Issues for this sprint are fetched on demand — show a skeleton until they
+  // arrive so the charts don't flash empty zeroes.
+  if (sprint && sprint.issuesLoaded === false) {
+    out.push(...renderSprintSkeleton(sprint));
+  } else {
+    const series = generateDailySeries(sprint, s.today);
+
+    const hero = renderSprintHero({ sprint, today: s.today });
+    hero.appendChild(renderStatusCard(sprint));
+    out.push(hero);
+
+    out.push(el('div', { class: 'row cols-2' }, [
+      chartCard('Burndown', renderBurndown(series), 'burndown'),
+      chartCard('Cumulative Flow', renderCFD(series), 'cfd'),
+    ]));
+    out.push(el('div', { class: 'row cols-2' }, [
+      chartCard('Burnup', renderBurnup(series), 'burnup'),
+      chartCard('Control Chart', renderControl(series), 'control'),
+    ]));
+    out.push(el('div', { class: 'row' }, [renderWorkloadTable({ sprint })]));
+  }
+  return out;
+}
+
+// Repaint ONLY the Sprint view content from current state. Called when a
+// sprint's issues finish loading (skeleton → charts) and when switching the
+// active sprint, so the rest of the page (topbar, background, tabs) is untouched.
+export function rerenderSprintView() {
+  const mount = document.getElementById('sprint-view-mount');
+  if (!mount) return; // not on the sprint view — nothing to do
+  mount.replaceChildren(...buildSprintView(getState()));
+}
+
+// Repaint ONLY the Jira load progress strip from current state. Tries to mutate
+// the existing strip in place (so the width transition animates and the spinner
+// keeps spinning); when the strip is not mounted yet, or it is being shown/
+// hidden, falls back to a full render so the bar is created/removed.
+export function rerenderProgress() {
+  if (!updateProgressOverlay(getState().loadProgress)) render();
+}
+
+// Repaint ONLY the data-source bar from current state. Called when the inline
+// Board ID panel is opened/closed so the topbar, background particles, tabs and
+// the whole content area are left untouched (no flash, no chart redraw).
+export function rerenderDataSource() {
+  const mount = document.getElementById('data-source-mount');
+  if (!mount) return;
+  mount.replaceChildren(dataSourceBar());
+}
+
+function buildRoadmap(s) {
+  return renderEpicRoadmap({
+    epics: s.epics,
+    sprints: s.sprints,
+    today: s.today,
+    expandedIds: s.expandedEpicIds,
+    filters: s.epicFilters,
+    onToggleExpand: toggleEpicExpanded,
+    onOpenDetail: openEpicDetail,
+  });
+}
+
+// Repaint ONLY the Portfolio Roadmap node from current state. Called as new
+// epic detail data streams in during progressive loading, so the rest of the
+// page (topbar, background, charts, filter bar) stays untouched.
+export function rerenderEpicRoadmap() {
+  const mount = document.getElementById('epic-roadmap-mount');
+  if (!mount) return; // not on the epic view (or not mounted yet) — nothing to do
+  mount.replaceChildren(buildRoadmap(getState()));
+}
+
+// Repaint ONLY the Epic view content (filter bar + roadmap + detail panel) from
+// current state. Called for Epic tab interactions and load completions so the
+// topbar, background particles, tabs and footer are left untouched (no flash).
+export function rerenderEpicView() {
+  const mount = document.getElementById('epic-view-mount');
+  if (!mount) return; // not on the epic view — nothing to do
+  mount.replaceChildren(...renderEpicView());
+}
+
 function renderEpicView() {
   const s = getState();
   const children = [];
@@ -278,15 +372,7 @@ function renderEpicView() {
     onClearAll: () => setEpicFilter({ status: 'all', sprintId: 'all', search: '' }),
   }));
 
-  children.push(renderEpicRoadmap({
-    epics: s.epics,
-    sprints: s.sprints,
-    today: s.today,
-    expandedIds: s.expandedEpicIds,
-    filters: s.epicFilters,
-    onToggleExpand: toggleEpicExpanded,
-    onOpenDetail: openEpicDetail,
-  }));
+  children.push(el('div', { id: 'epic-roadmap-mount' }, [buildRoadmap(s)]));
 
   const detailEpic = s.epicDetailId
     ? s.epics.find((e) => e.id === s.epicDetailId)
@@ -356,42 +442,14 @@ export function render() {
     return;
   }
 
-  const children = [topbar(), dataSourceBar()];
+  const children = [topbar(), el('div', { id: 'data-source-mount' }, [dataSourceBar()])];
   children.push(renderViewTabs({ active: s.view, onChange: setView }));
   if (s.error) children.push(el('div', { class: 'banner error' }, [s.error]));
 
   if (s.view === 'epic') {
-    children.push(...renderEpicView());
+    children.push(el('div', { id: 'epic-view-mount' }, renderEpicView()));
   } else {
-    const sprint = activeSprint();
-
-    children.push(renderSprintFilter({
-      sprints: s.sprints,
-      activeId: s.activeSprintId,
-      onChange: setActiveSprint,
-    }));
-
-    // Issues for this sprint are fetched on demand — show a skeleton until they arrive
-    // so the charts don't flash empty zeroes.
-    if (sprint && sprint.issuesLoaded === false) {
-      children.push(...renderSprintSkeleton(sprint));
-    } else {
-      const series = generateDailySeries(sprint, s.today);
-
-      const hero = renderSprintHero({ sprint, today: s.today });
-      hero.appendChild(renderStatusCard(sprint));
-      children.push(hero);
-
-      children.push(el('div', { class: 'row cols-2' }, [
-        chartCard('Burndown', renderBurndown(series), 'burndown'),
-        chartCard('Cumulative Flow', renderCFD(series), 'cfd'),
-      ]));
-      children.push(el('div', { class: 'row cols-2' }, [
-        chartCard('Burnup', renderBurnup(series), 'burnup'),
-        chartCard('Control Chart', renderControl(series), 'control'),
-      ]));
-      children.push(el('div', { class: 'row' }, [renderWorkloadTable({ sprint })]));
-    }
+    children.push(el('div', { id: 'sprint-view-mount' }, buildSprintView(s)));
   }
 
   children.push(el('footer', { class: 'footer' }, [

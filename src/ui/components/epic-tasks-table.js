@@ -30,7 +30,9 @@ export function renderEpicTasksTable({ epic }) {
     return a.key.localeCompare(b.key);
   });
 
-  const rows = tasks.map((t) => el('tr', {}, [
+  const rows = tasks.map((t) => {
+    const assignee = t.assignee || { color: 'var(--ink-4, oklch(0.5 0.02 270))', initials: '?', name: 'Unassigned' };
+    return el('tr', {}, [
     el('td', {}, [el('span', { class: 'mono-key' }, [t.key])]),
     el('td', { class: 'epic-task-summary' }, [t.summary]),
     el('td', {}, [el('span', { class: 'sprint-chip' }, [
@@ -40,9 +42,9 @@ export function renderEpicTasksTable({ epic }) {
       el('div', { class: 'user-cell-mini' }, [
         el('div', {
           class: 'avatar-mini',
-          style: { background: t.assignee.color, color: 'oklch(0.2 0.02 270)' },
-        }, [t.assignee.initials]),
-        el('span', {}, [t.assignee.name]),
+          style: { background: assignee.color, color: 'oklch(0.2 0.02 270)' },
+        }, [assignee.initials]),
+        el('span', {}, [assignee.name]),
       ]),
     ]),
     el('td', {}, [
@@ -53,7 +55,8 @@ export function renderEpicTasksTable({ epic }) {
     ]),
     el('td', { class: 'mono-cell' }, [fmtDate(t.startedDate)]),
     el('td', { class: 'mono-cell' }, [fmtDate(t.doneDate)]),
-  ]));
+    ]);
+  });
 
   return el('div', { class: 'card' }, [
     el('h3', { class: 'card-title' }, [

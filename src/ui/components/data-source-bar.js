@@ -2,7 +2,7 @@ import { el } from '../dom.js';
 import { isAuthenticated, getWorkerUrl } from '../../services/auth.js';
 import {
   loadDemo, loadFromFile, refreshFromApi, showError, requireLogin,
-  setApiPanelOpen, loadFromApi, setPendingBoardId, getSavedBoardId,
+  setApiPanelOpen, loadFromApi, setPendingBoardId, getSavedBoardId, getRecentBoards,
 } from '../../app/actions.js';
 import { renderProgressOverlay } from './progress-overlay.js';
 
@@ -42,7 +42,42 @@ function hiddenFileInput() {
   return input;
 }
 
-function buildInlineBoardInput({ pendingBoardId, workerUrl }) {
+// Strip the "Jira API · " prefix so the chip shows just the board name/id.
+function shortBoardLabel(label, boardId) {
+  if (!label) return `Board ${boardId}`;
+  return label.replace(/^Jira API · /, '');
+}
+
+// Floating quick-switch list for boards this user has already loaded. Anchored
+// (position:absolute) to the Board ID field so it overlays the content below
+// instead of growing the bar — no layout shift / screen jump. The board
+// currently in the input is excluded. Clicking an item loads it from cache.
+function buildRecentDropdown({ recentBoards, activeBoardId }) {
+  const others = (recentBoards || []).filter((b) => String(b.boardId) !== String(activeBoardId));
+  if (!others.length) return null;
+
+  const items = others.map((b) => {
+    const item = el('button', {
+      class: 'board-recent-item', type: 'button',
+      title: `Load board ${b.boardId} (cached)`,
+    }, [
+      el('span', { class: 'board-recent-name' }, [shortBoardLabel(b.label, b.boardId)]),
+      el('span', { class: 'board-recent-id' }, [`#${b.boardId}`]),
+    ]);
+    item.addEventListener('click', () => loadFromApi(String(b.boardId)));
+    return item;
+  });
+
+  const dropdown = el('div', { class: 'board-recent-dropdown' }, [
+    el('div', { class: 'board-recent-head' }, ['Recent boards']),
+    ...items,
+  ]);
+  // Keep the input focused on click so the click lands before blur closes us.
+  dropdown.addEventListener('mousedown', (e) => e.preventDefault());
+  return dropdown;
+}
+
+function buildInlineBoardInput({ pendingBoardId, workerUrl, recentBoards }) {
   const savedBoardId = pendingBoardId || getSavedBoardId();
 
   const boardIdInput = el('input', {
@@ -66,7 +101,7 @@ function buildInlineBoardInput({ pendingBoardId, workerUrl }) {
     }
   });
 
-  return el('div', {
+  const field = el('div', {
     class: 'inline-board-field',
     'data-tooltip': 'Board ID can be found in your Jira board URL:\n/jira/software/projects/XXX/boards/{boardId}',
   }, [
@@ -74,6 +109,32 @@ function buildInlineBoardInput({ pendingBoardId, workerUrl }) {
     boardIdInput,
     submit,
   ]);
+
+  // Recent boards live in a floating dropdown revealed on focus (with a chevron
+  // affordance), so the bar height never changes when the panel opens/switches.
+  const dropdown = buildRecentDropdown({ recentBoards, activeBoardId: savedBoardId });
+  if (dropdown) {
+    field.classList.add('has-recent');
+
+    const caret = el('button', {
+      class: 'recent-toggle', type: 'button',
+      title: 'Recent boards', 'aria-label': 'Recent boards',
+    }, ['▾']);
+    caret.addEventListener('click', () => {
+      if (dropdown.classList.contains('open')) dropdown.classList.remove('open');
+      else boardIdInput.focus(); // focus handler opens it
+    });
+
+    boardIdInput.addEventListener('focus', () => dropdown.classList.add('open'));
+    boardIdInput.addEventListener('blur', () => {
+      setTimeout(() => dropdown.classList.remove('open'), 140);
+    });
+
+    field.insertBefore(caret, submit);
+    field.appendChild(dropdown);
+  }
+
+  return field;
 }
 
 export function renderDataSource({
@@ -108,7 +169,7 @@ export function renderDataSource({
     }, ['Connect with Jira']);
 
     const fileBtn = el('button', {
-      class: `ds-btn ${activeSource === 'file' ? 'active' : ''} ${!authed ? 'disabled' : ''}`,
+      class: `ds-btn ${activeSource === 'file' && !apiPanelOpen ? 'active' : ''} ${!authed ? 'disabled' : ''}`,
       onClick: () => {
         if (!authed) {
           showError('Please login to import files.');
@@ -123,20 +184,33 @@ export function renderDataSource({
       class: `ds-btn refresh-btn ${isRefreshing ? 'refreshing' : ''}`,
       onClick: refreshFromApi,
       disabled: isRefreshing,
-      style: { display: activeSource === 'api' ? 'inline-flex' : 'none' },
     }, [
       el('span', { class: 'refresh-icon' }, ['↻']),
       'Refresh',
     ]);
 
     const progressNode = renderProgressOverlay({ progress: loadProgress });
-    const trailing = progressNode
-      ? progressNode
-      : inlineBoardEl || el('span', { class: 'ds-status' }, [status]);
+
+    // Trailing region, right-aligned. While the inline board panel or load
+    // progress strip is showing, it owns the right side; otherwise show the
+    // "Updated …" status with the Refresh button beside it: "Updated xxx | ↻".
+    let trailing;
+    if (progressNode) {
+      trailing = progressNode;
+    } else if (inlineBoardEl) {
+      trailing = inlineBoardEl;
+    } else {
+      const right = [el('span', { class: 'ds-status' }, [status])];
+      if (activeSource === 'api') {
+        right.push(el('span', { class: 'ds-divider' }));
+        right.push(refresh);
+      }
+      trailing = el('div', { class: 'ds-trailing' }, right);
+    }
 
     return el('div', { class: 'data-source-bar' }, [
       el('span', { class: 'ds-label' }, ['Data source']),
-      demoBtn, apiBtn, fileBtn, fileInput, refresh,
+      demoBtn, apiBtn, fileBtn, fileInput,
       trailing,
     ]);
   }
@@ -148,7 +222,8 @@ export function renderDataSource({
     (async () => {
       try {
         workerUrlCache = workerUrlCache || await getWorkerUrl();
-        const inlineBoardEl = buildInlineBoardInput({ pendingBoardId, workerUrl: workerUrlCache });
+        const recentBoards = await getRecentBoards().catch(() => []);
+        const inlineBoardEl = buildInlineBoardInput({ pendingBoardId, workerUrl: workerUrlCache, recentBoards });
         container.innerHTML = '';
         container.appendChild(paintBar(inlineBoardEl));
       } catch (e) {
