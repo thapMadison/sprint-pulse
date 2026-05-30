@@ -136,6 +136,154 @@ html.theme-light {
   to { transform: rotate(360deg); }
 }
 
+/* ============================================================
+   Floating Refresh FAB — visible after scrolling past the data-source-bar
+   ============================================================ */
+.refresh-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 8px 8px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  backdrop-filter: blur(20px);
+  box-shadow:
+    0 8px 24px -6px rgba(0, 0, 0, 0.25),
+    0 2px 6px -1px rgba(0, 0, 0, 0.1);
+  /* Hidden by default — slide up + fade in when .visible is added */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(12px);
+  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;
+  pointer-events: none;
+}
+.refresh-fab.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.refresh-fab .fab-status {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  letter-spacing: 0.02em;
+}
+
+.refresh-fab .fab-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--violet), var(--cyan));
+  border: none;
+  color: white;
+  cursor: pointer;
+  box-shadow:
+    0 4px 12px -2px oklch(0.7 0.18 295 / 0.5),
+    inset 0 1px 0 oklch(1 0 0 / 0.3);
+  transition: transform 0.2s ease, filter 0.2s ease, box-shadow 0.2s ease;
+}
+.refresh-fab .fab-btn:hover:not(:disabled) {
+  transform: scale(1.08);
+  filter: brightness(1.12) saturate(1.1);
+  box-shadow:
+    0 8px 20px -4px oklch(0.7 0.18 295 / 0.6),
+    inset 0 1px 0 oklch(1 0 0 / 0.4);
+}
+.refresh-fab .fab-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.refresh-fab .fab-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.refresh-fab .fab-refresh-icon {
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 0.3s ease;
+}
+.refresh-fab .fab-btn:hover:not(:disabled) .fab-refresh-icon:not(.spinning) {
+  transform: rotate(180deg);
+}
+.refresh-fab .fab-refresh-icon.spinning {
+  animation: spin 1s linear infinite;
+}
+
+.theme-light .refresh-fab {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 8px 24px -6px rgba(0, 0, 0, 0.15),
+    0 2px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+/* Mobile: tighter spacing, hide status text on very narrow screens */
+@media (max-width: 480px) {
+  .refresh-fab {
+    bottom: 16px;
+    right: 16px;
+    padding: 6px 6px 6px 12px;
+    gap: 8px;
+  }
+  .refresh-fab .fab-status {
+    font-size: 10px;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* ============================================================
+   Floating Sprint/Epic switcher — bottom-left companion to the refresh FAB.
+   Reuses .view-tabs base styling; this block only handles fixed positioning
+   and the scroll-triggered slide-in (mirrors .refresh-fab).
+   ============================================================ */
+.view-tabs-fab {
+  position: fixed;
+  top: 24px;
+  left: 24px;
+  z-index: 90;
+  margin-bottom: 0;
+  box-shadow:
+    0 8px 24px -6px rgba(0, 0, 0, 0.25),
+    0 2px 6px -1px rgba(0, 0, 0, 0.1);
+  /* Hidden by default — slide down + fade in when .visible is added */
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-12px);
+  transition: opacity 0.22s ease, transform 0.22s ease, visibility 0.22s;
+  pointer-events: none;
+}
+.view-tabs-fab.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.theme-light .view-tabs-fab {
+  box-shadow:
+    0 8px 24px -6px rgba(0, 0, 0, 0.15),
+    0 2px 6px -1px rgba(0, 0, 0, 0.05);
+}
+
+@media (max-width: 480px) {
+  .view-tabs-fab {
+    top: 16px;
+    left: 16px;
+  }
+}
+
 .theme-light .data-source-bar .ds-btn {
   background: rgba(255, 255, 255, 0.7);
   border-color: rgba(0, 0, 0, 0.1);

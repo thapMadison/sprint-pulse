@@ -13,30 +13,32 @@ function brandGradient(id) {
   ]);
 }
 
-function iconSprint() {
+function iconSprint(gradId = 'vtGradSprint') {
   return svg('svg', {
     width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none',
     stroke: 'currentColor', 'stroke-width': 2.25,
     'stroke-linecap': 'round', 'stroke-linejoin': 'round',
   }, [
-    brandGradient('vtGradSprint'),
+    brandGradient(gradId),
     svg('path', { d: 'M3 12h4l3-7 4 14 3-7h4' }),
   ]);
 }
 
-function iconEpic() {
+function iconEpic(gradId = 'vtGradEpic') {
   // Lucide "layers" — stacked planes read as a portfolio of epics.
   return svg('svg', {
     width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none',
     stroke: 'currentColor', 'stroke-width': 2.25,
     'stroke-linecap': 'round', 'stroke-linejoin': 'round',
   }, [
-    brandGradient('vtGradEpic'),
+    brandGradient(gradId),
     svg('path', { d: 'M12 2 2 7l10 5 10-5-10-5Z' }),
     svg('path', { d: 'm2 17 10 5 10-5' }),
     svg('path', { d: 'm2 12 10 5 10-5' }),
   ]);
 }
+
+export { iconSprint, iconEpic };
 
 export function renderViewTabs({ active, onChange }) {
   const tab = (key, label, icon) => {

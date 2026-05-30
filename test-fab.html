@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en" class="theme-light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FAB Test</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/styles.css">
+  <link rel="stylesheet" href="assets/extras.css">
+  <style>
+    .test-content {
+      padding: 20px;
+      min-height: 200vh;
+    }
+    .test-section {
+      margin-bottom: 40px;
+      padding: 20px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="test-content">
+    <h1>Floating Refresh FAB Test</h1>
+    <p>Scroll down past 100px to see the FAB appear in the bottom-right corner.</p>
+
+    <div class="test-section">
+      <h2>Section 1</h2>
+      <p>The FAB should be hidden when you're at the top of the page.</p>
+    </div>
+
+    <div class="test-section">
+      <h2>Section 2</h2>
+      <p>Keep scrolling...</p>
+    </div>
+
+    <div class="test-section">
+      <h2>Section 3</h2>
+      <p>The FAB should now be visible! It shows:</p>
+      <ul>
+        <li>Status text: "Updated X mins ago" or "Refreshing..."</li>
+        <li>Refresh button with spinning icon when active</li>
+      </ul>
+    </div>
+
+    <div class="test-section">
+      <h2>Section 4</h2>
+      <p>Click the refresh button to see the spinning animation.</p>
+    </div>
+
+    <div class="test-section">
+      <h2>Section 5</h2>
+      <p>Scroll back up to see the FAB fade out.</p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { renderRefreshFAB, updateRefreshFAB } from './src/ui/components/refresh-fab.js';
+
+    // Mock state
+    let isRefreshing = false;
+    let lastUpdated = new Date();
+
+    // Render FAB
+    const fab = renderRefreshFAB({
+      sourceKey: 'api',
+      isRefreshing,
+      lastUpdated,
+    });
+
+    if (fab) {
+      fab.id = 'refresh-fab-mount';
+      document.body.appendChild(fab);
+
+      // Override the refresh action to simulate refresh
+      const btn = fab.querySelector('.fab-btn');
+      btn.onclick = () => {
+        if (isRefreshing) return;
+
+        isRefreshing = true;
+        updateRefreshFAB(fab, { isRefreshing, lastUpdated });
+
+        // Simulate 2-second refresh
+        setTimeout(() => {
+          isRefreshing = false;
+          lastUpdated = new Date();
+          updateRefreshFAB(fab, { isRefreshing, lastUpdated });
+        }, 2000);
+      };
+
+      // Update timestamp every 10 seconds
+      setInterval(() => {
+        if (!isRefreshing) {
+          updateRefreshFAB(fab, { isRefreshing, lastUpdated });
+        }
+      }, 10000);
+    }
+  </script>
+</body>
+</html>

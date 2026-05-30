@@ -12,6 +12,8 @@ import { renderViewTabs } from '../ui/components/view-tabs.js';
 import { renderEpicFilterBar } from '../ui/components/epic-filter-bar.js';
 import { renderEpicDetailPanel } from '../ui/components/epic-detail-panel.js';
 import { updateProgressOverlay } from '../ui/components/progress-overlay.js';
+import { renderRefreshFAB, updateRefreshFAB } from '../ui/components/refresh-fab.js';
+import { renderViewTabsFAB, updateViewTabsFAB } from '../ui/components/view-tabs-fab.js';
 
 import { renderBurndown } from '../charts/burndown.js';
 import { renderBurnup } from '../charts/burnup.js';
@@ -423,6 +425,65 @@ function dataSourceBar() {
   });
 }
 
+// ─── Floating Refresh FAB ────────────────────────────────────────────────────
+// Mounted once into <body> (outside #root) so it survives full re-renders and
+// the scroll listener is never leaked. rerenderFAB() updates it in-place.
+
+function fabProps() {
+  const s = getState();
+  return { sourceKey: s.sourceKey, isRefreshing: s.isRefreshing, lastUpdated: s.lastUpdated };
+}
+
+function ensureFAB() {
+  const props = fabProps();
+  const existing = document.getElementById('refresh-fab-mount');
+
+  // Source is not API — remove FAB if it exists (cleanup scroll listener too)
+  if (props.sourceKey !== 'api') {
+    if (existing) {
+      if (existing._cleanup) existing._cleanup();
+      existing.remove();
+    }
+    return;
+  }
+
+  // Source is API — create if missing, update if present
+  if (!existing) {
+    const node = renderRefreshFAB(props);
+    if (!node) return;
+    node.id = 'refresh-fab-mount';
+    document.body.appendChild(node);
+  } else {
+    updateRefreshFAB(existing, props);
+  }
+}
+
+export function rerenderFAB() {
+  ensureFAB();
+}
+
+// ─── Floating Sprint/Epic tab switcher ───────────────────────────────────────
+// Same lifecycle as the refresh FAB: mounted once into <body>, survives full
+// re-renders, scroll listener cleaned up on teardown. Always present (unlike the
+// refresh FAB, which is API-only) since switching views is relevant for every
+// data source.
+
+function ensureViewTabsFAB() {
+  const s = getState();
+  const existing = document.getElementById('view-tabs-fab-mount');
+  if (!existing) {
+    const node = renderViewTabsFAB({ active: s.view, onChange: setView });
+    node.id = 'view-tabs-fab-mount';
+    document.body.appendChild(node);
+  } else {
+    updateViewTabsFAB(existing, { active: s.view });
+  }
+}
+
+export function rerenderViewTabsFAB() {
+  ensureViewTabsFAB();
+}
+
 export function render() {
   const root = document.getElementById('root');
   if (!root) return;
@@ -458,4 +519,8 @@ export function render() {
   ]));
 
   root.appendChild(el('div', { class: 'app' }, children));
+
+  // Ensure FAB is mounted (or updated if already exists)
+  ensureFAB();
+  ensureViewTabsFAB();
 }

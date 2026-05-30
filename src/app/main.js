@@ -1,6 +1,6 @@
 import { initFirebase, onAuthStateChange } from '../services/auth.js';
 import { setState, subscribe, subscribeEpicRoadmap, subscribeEpicView, subscribeSprintView, subscribeLoadProgress, subscribeDataSource } from './state.js';
-import { render, rerenderEpicRoadmap, rerenderEpicView, rerenderSprintView, rerenderProgress, rerenderDataSource } from './render.js';
+import { render, rerenderEpicRoadmap, rerenderEpicView, rerenderSprintView, rerenderProgress, rerenderDataSource, rerenderFAB } from './render.js';
 import { restoreLastSource, flushCache } from './actions.js';
 
 subscribe(render);
@@ -9,6 +9,13 @@ subscribeEpicView(rerenderEpicView);
 subscribeSprintView(rerenderSprintView);
 subscribeLoadProgress(rerenderProgress);
 subscribeDataSource(rerenderDataSource);
+
+// Keep the floating Refresh FAB in step with refresh state. refreshFromApi flips
+// isRefreshing via the main channel (full render handles it), and lands the new
+// lastUpdated / isRefreshing:false via the sprint-view channel — subscribe to
+// both so the FAB's status + spinner update in place either way.
+subscribeSprintView(rerenderFAB);
+subscribeLoadProgress(rerenderFAB);
 
 initFirebase().then(() => {
   onAuthStateChange((user) => {
