@@ -1,5 +1,6 @@
 import { el } from '../dom.js';
 import { fmtDate, fmtDow, metaItem, dayUnit } from '../hero-helpers.js';
+import { issueTypeIcon } from './issue-type-icon.js';
 
 function daysBetween(a, b) {
   if (!a || !b) return 0;
@@ -68,7 +69,10 @@ export function renderEpicHero({ epic, today }) {
     el('div', { class: 'card sprint-card epic-hero-card' }, [
       el('div', { class: 'sprint-card-header' }, [
         el('div', { class: 'name' }, [
-          el('span', { class: 'epic-hero-key' }, [epic.isNoEpic ? 'NO EPIC' : epic.key]),
+          el('span', { class: 'issue-key-cell' }, [
+            epic.isNoEpic ? null : issueTypeIcon('epic', { size: 18, withTitle: false }),
+            el('span', { class: 'epic-hero-key' }, [epic.isNoEpic ? 'NO EPIC' : epic.key]),
+          ]),
           el('span', { class: 'epic-hero-name' }, [epic.name]),
         ]),
         el('div', { class: 'epic-hero-badges' }, [

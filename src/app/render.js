@@ -5,7 +5,7 @@ import { generateDailySeries } from '../domain/series.js';
 import { renderBackground } from '../ui/components/background.js';
 import { renderTopbar } from '../ui/components/topbar.js';
 import { renderDataSource } from '../ui/components/data-source-bar.js';
-import { renderSprintFilter } from '../ui/components/sprint-filter.js';
+import { renderSprintFilter, updateSprintFilterActive } from '../ui/components/sprint-filter.js';
 import { renderSprintHero } from '../ui/components/sprint-hero.js';
 import { renderWorkloadTable } from '../ui/components/workload-table.js';
 import { renderViewTabs } from '../ui/components/view-tabs.js';
@@ -251,18 +251,13 @@ function renderEpicLoadingBanner(progress) {
   ]);
 }
 
-// Build the Sprint view content (filter tabs + skeleton or hero/charts/table).
-// Returns an array of nodes so it can mount inside a single container that we
-// can repaint in isolation as a sprint's issues stream in.
-function buildSprintView(s) {
+// Build the repaintable Sprint content (skeleton or hero/charts/table) — i.e.
+// everything EXCEPT the filter tabs. Returns an array of nodes mounted inside
+// #sprint-content-mount, so it can be repainted in isolation as a sprint's
+// issues stream in or the active sprint switches.
+function buildSprintContent(s) {
   const out = [];
   const sprint = activeSprint();
-
-  out.push(renderSprintFilter({
-    sprints: s.sprints,
-    activeId: s.activeSprintId,
-    onChange: setActiveSprint,
-  }));
 
   // Issues for this sprint are fetched on demand — show a skeleton until they
   // arrive so the charts don't flash empty zeroes.
@@ -288,13 +283,31 @@ function buildSprintView(s) {
   return out;
 }
 
-// Repaint ONLY the Sprint view content from current state. Called when a
-// sprint's issues finish loading (skeleton → charts) and when switching the
-// active sprint, so the rest of the page (topbar, background, tabs) is untouched.
+// Build the full Sprint view: the filter tabs (rendered ONCE, kept outside the
+// repaint area) plus the content mount. Switching sprints / loading issues never
+// rebuilds the filter — that preserves the state-filter pill selection and the
+// horizontal scroll position; only the active highlight is moved in place.
+function buildSprintView(s) {
+  return [
+    renderSprintFilter({
+      sprints: s.sprints,
+      activeId: s.activeSprintId,
+      onChange: setActiveSprint,
+    }),
+    el('div', { id: 'sprint-content-mount' }, buildSprintContent(s)),
+  ];
+}
+
+// Repaint ONLY the Sprint content area from current state, and move the filter's
+// active highlight in place. Called when a sprint's issues finish loading
+// (skeleton → charts) and when switching the active sprint, so the rest of the
+// page (topbar, background, tabs, filter tabs) is untouched.
 export function rerenderSprintView() {
-  const mount = document.getElementById('sprint-view-mount');
+  const mount = document.getElementById('sprint-content-mount');
   if (!mount) return; // not on the sprint view — nothing to do
-  mount.replaceChildren(...buildSprintView(getState()));
+  const s = getState();
+  updateSprintFilterActive(s.activeSprintId);
+  mount.replaceChildren(...buildSprintContent(s));
 }
 
 // Repaint ONLY the Jira load progress strip from current state. Tries to mutate

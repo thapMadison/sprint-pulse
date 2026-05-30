@@ -5,6 +5,7 @@
 // - Click epic name to open the side detail panel.
 import { el } from '../ui/dom.js';
 import { shortSprintName } from '../ui/format.js';
+import { issueTypeIcon } from '../ui/components/issue-type-icon.js';
 
 const MIN_PX_PER_DAY = 6;
 const MAX_PX_PER_DAY = 22;
@@ -259,6 +260,7 @@ function epicRow({ epic, expanded, dayToPct, today, onToggle, onOpenDetail }) {
     }, [chevron(expanded)]),
     el('div', { class: 'roadmap-meta' }, [
       el('div', { class: 'roadmap-meta-top' }, [
+        epic.isNoEpic ? null : issueTypeIcon('epic', { size: 14, withTitle: false }),
         el('span', { class: 'roadmap-key' }, [epic.isNoEpic ? 'NO EPIC' : epic.key]),
         statusPill(epic),
       ]),
@@ -282,6 +284,7 @@ function epicRow({ epic, expanded, dayToPct, today, onToggle, onOpenDetail }) {
 function taskRow({ task, dayToPct, today, sprints }) {
   const left = el('div', { class: 'roadmap-row-left task-left' }, [
     el('span', { class: 'roadmap-task-indent' }),
+    issueTypeIcon(task.type, { size: 15 }),
     el('span', { class: 'roadmap-task-key' }, [task.key]),
     el('span', { class: 'roadmap-task-summary' }, [task.summary || '']),
     el('span', { class: `roadmap-task-status ${task.status}` }, [

@@ -11,7 +11,7 @@ import {
 import * as cache from '../services/data-cache.js';
 import {
   fetchSprintFromWorker, fetchSprintListFromWorker, fetchBoardFromWorker,
-  fetchEpicsFromWorker, fetchEpicIssuesFromWorker,
+  fetchEpicsFromWorker, fetchEpicIssuesFromWorker, fetchIssueDetailFromWorker,
 } from '../services/jira-api.js';
 import { setState, setStateSilent, setEpicRoadmapState, setEpicViewState, setSprintViewState, setLoadProgressState, setDataSourceState, getState, DEFAULT_EPIC_FILTERS } from './state.js';
 import { DEMO_EPICS } from '../data/demo.js';
@@ -656,6 +656,19 @@ export async function restoreLastSource(user) {
     localStorage.setItem(BOARD_ID_KEY, pointer.sourceId);
   }
   restoreSnapshot(snap);
+}
+
+// Lazily fetch full detail (description, comments, reporter, labels, dates) for
+// a single issue when the task detail panel opens. Only the Jira API source can
+// supply these — demo/file return null so the panel just shows what it has.
+export async function fetchTaskDetail(issueKey) {
+  if (getState().sourceKey !== 'api') return null;
+  if (!isAuthenticated()) return null;
+  const workerUrl = await getWorkerUrl();
+  if (!workerUrl) return null;
+  const boardId = localStorage.getItem(BOARD_ID_KEY);
+  if (!boardId) return null;
+  return fetchIssueDetailFromWorker(workerUrl, issueKey, boardId);
 }
 
 // Force pending cache writes to disk — call when the tab is hidden/unloaded so

@@ -1,10 +1,15 @@
 import { el } from '../dom.js';
 import { svg } from '../../charts/svg.js';
 import { statusLabel } from '../format.js';
+import { renderTaskDetailPanel } from './task-detail-panel.js';
+import { issueTypeIcon } from './issue-type-icon.js';
 
-function renderIssueRow(iss) {
-  return el('div', { class: 'issue-row' }, [
-    el('span', { class: 'key' }, [iss.key]),
+function renderIssueRow(iss, onOpen) {
+  return el('div', { class: 'issue-row issue-row-clickable', onClick: () => onOpen(iss) }, [
+    el('span', { class: 'key issue-key-cell' }, [
+      issueTypeIcon(iss.type, { size: 16 }),
+      el('span', {}, [iss.key]),
+    ]),
     el('span', { class: 'summary' }, [iss.summary]),
     el('span', {}, [
       el('span', { class: `status-chip ${iss.status}` }, [
@@ -63,6 +68,12 @@ function groupByUser(issues) {
   return Array.from(byUser.values()).sort((a, b) => b.est - a.est);
 }
 
+// Does an issue match the search query (by key or summary)?
+function issueMatches(iss, q) {
+  if (!q) return true;
+  return `${iss.key} ${iss.summary}`.toLowerCase().includes(q);
+}
+
 function chevronCell() {
   const span = el('span', { class: 'expand-icon' }, []);
   span.appendChild(svg('svg', {
@@ -82,23 +93,59 @@ function numCell(value, accent) {
   }, [value]);
 }
 
+function searchIcon() {
+  return svg('svg', {
+    class: 'workload-search-icon',
+    width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none',
+    stroke: 'currentColor', 'stroke-width': 2,
+    'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+  }, [
+    svg('circle', { cx: 11, cy: 11, r: 8 }),
+    svg('path', { d: 'm21 21-4.3-4.3' }),
+  ]);
+}
+
 export function renderWorkloadTable({ sprint }) {
-  const rows = groupByUser(sprint.issues);
+  const allRows = groupByUser(sprint.issues);
   let expandedUserId = null;
+  let query = '';
+
   const tbody = el('tbody', {}, []);
+
+  // The detail panel mounts into <body>; we keep a handle so we can swap/remove it.
+  let openPanel = null;
+  function closeDetail() {
+    if (openPanel && openPanel.parentNode) openPanel.parentNode.removeChild(openPanel);
+    openPanel = null;
+  }
+  function openDetail(issue) {
+    closeDetail();
+    openPanel = renderTaskDetailPanel({ issue, onClose: closeDetail });
+    if (openPanel) document.body.appendChild(openPanel);
+  }
 
   function renderBody() {
     tbody.innerHTML = '';
-    for (const row of rows) {
+
+    // When searching, only show users with ≥1 matching task, auto-expand them,
+    // and list only the matching tasks inside.
+    const searching = query.length > 0;
+
+    for (const row of allRows) {
+      const matchingIssues = searching ? row.issues.filter((i) => issueMatches(i, query)) : row.issues;
+      if (searching && matchingIssues.length === 0) continue;
+
       const totalCt = row.issues.length || 1;
       const segDone = (row.counts.done / totalCt) * 100;
       const segInProg = (row.counts.inprogress / totalCt) * 100;
       const segTodo = (row.counts.todo / totalCt) * 100;
-      const isOpen = expandedUserId === row.user.id;
+      // While searching, every shown user is auto-expanded; otherwise honour the click state.
+      const isOpen = searching ? true : expandedUserId === row.user.id;
 
       const tr = el('tr', {
         class: isOpen ? 'expanded' : '',
         onClick: () => {
+          if (searching) return; // expansion is forced while searching
           expandedUserId = isOpen ? null : row.user.id;
           renderBody();
         },
@@ -111,7 +158,11 @@ export function renderWorkloadTable({ sprint }) {
             }, [row.user.initials]),
             el('div', {}, [
               el('div', { class: 'name' }, [row.user.name]),
-              el('div', { class: 'sub' }, [`${totalCt} issue${totalCt !== 1 ? 's' : ''}`]),
+              el('div', { class: 'sub' }, [
+                searching
+                  ? `${matchingIssues.length} of ${totalCt} match`
+                  : `${totalCt} issue${totalCt !== 1 ? 's' : ''}`,
+              ]),
             ]),
           ]),
         ]),
@@ -143,14 +194,34 @@ export function renderWorkloadTable({ sprint }) {
           el('td', { colSpan: 6 }, [
             el('div', { class: 'issue-list' }, [
               renderIssueListHeader(),
-              ...row.issues.map(renderIssueRow),
+              ...matchingIssues.map((iss) => renderIssueRow(iss, openDetail)),
             ]),
           ]),
         ]));
       }
     }
+
+    // No user matched the query.
+    if (query && tbody.children.length === 0) {
+      tbody.appendChild(el('tr', {}, [
+        el('td', { colSpan: 6, style: { textAlign: 'center', color: 'var(--ink-3)', padding: '24px' } }, [
+          `No tasks match "${query}".`,
+        ]),
+      ]));
+    }
   }
   renderBody();
+
+  const searchInput = el('input', {
+    class: 'workload-search-input',
+    type: 'text',
+    placeholder: 'Search tasks by key or summary…',
+  });
+  searchInput.addEventListener('input', () => {
+    query = searchInput.value.trim().toLowerCase();
+    renderBody();
+  });
+  const searchBox = el('div', { class: 'workload-search' }, [searchIcon(), searchInput]);
 
   return el('div', { class: 'card' }, [
     el('h3', { class: 'card-title' }, [
@@ -162,8 +233,9 @@ export function renderWorkloadTable({ sprint }) {
           letterSpacing: '0.05em',
           textTransform: 'none',
         },
-      }, [`${rows.length} contributors · click row to expand`]),
+      }, [`${allRows.length} contributors · click a task for details`]),
     ]),
+    searchBox,
     el('table', { class: 'workload-table' }, [
       el('thead', {}, [
         el('tr', {}, [

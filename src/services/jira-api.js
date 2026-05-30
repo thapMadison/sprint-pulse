@@ -50,3 +50,9 @@ export async function fetchEpicsFromWorker(workerUrl, boardId) {
 export async function fetchEpicIssuesFromWorker(workerUrl, epicKey, boardId) {
   return workerGet(workerUrl, `/epic/${encodeURIComponent(epicKey)}?boardId=${encodeURIComponent(boardId)}`);
 }
+
+// Fetch full detail for a single issue (description, comments, reporter, labels,
+// dates). Loaded lazily when the user opens the task detail panel.
+export async function fetchIssueDetailFromWorker(workerUrl, issueKey, boardId) {
+  return workerGet(workerUrl, `/issue/${encodeURIComponent(issueKey)}?boardId=${encodeURIComponent(boardId)}`);
+}

@@ -337,7 +337,64 @@ export default {
         }, 200, cors);
       }
 
-      return json({ error: 'Not found. Use /board, /sprints, /sprint/:id, /all, /epics, or /epic/:key' }, 404, cors);
+      // GET /issue/:key - Full detail for a single issue, fetched lazily when
+      // the user opens the task detail panel. Returns the rich fields the list
+      // endpoints omit (description, comments, reporter, labels, dates).
+      const issueMatch = path.match(/^\/issue\/([A-Z][A-Z0-9]+-\d+)$/i);
+      if (issueMatch) {
+        const issueKey = issueMatch[1].toUpperCase();
+        const fields = 'summary,status,assignee,reporter,issuetype,priority,timetracking,created,updated,duedate,labels,components,parent,description';
+        const data = await jiraFetch(
+          `${env.JIRA_BASE_URL}/rest/api/3/issue/${encodeURIComponent(issueKey)}?fields=${fields}&expand=renderedFields`,
+          headers
+        );
+        const f = data.fields || {};
+        const tt = f.timetracking || {};
+        const assignee = f.assignee || {};
+        const reporter = f.reporter || {};
+
+        // Comments come from a separate sub-resource (most recent 50).
+        let comments = [];
+        try {
+          const commentData = await jiraFetch(
+            `${env.JIRA_BASE_URL}/rest/api/3/issue/${encodeURIComponent(issueKey)}/comment?maxResults=50&orderBy=created`,
+            headers
+          );
+          comments = (commentData.comments || []).map((c) => ({
+            id: c.id,
+            authorName: c.author?.displayName || 'Unknown',
+            created: c.created || null,
+            updated: c.updated || null,
+            body: adfToText(c.body),
+          }));
+        } catch {
+          // Comments are best-effort; an error here shouldn't fail the whole panel.
+        }
+
+        return json({
+          key: data.key,
+          summary: f.summary || '',
+          type: f.issuetype?.name || 'Task',
+          priority: f.priority?.name || null,
+          status: f.status || null,
+          assigneeName: assignee.displayName || 'Unassigned',
+          reporterName: reporter.displayName || null,
+          description: adfToText(f.description),
+          labels: f.labels || [],
+          components: (f.components || []).map((c) => c.name).filter(Boolean),
+          created: f.created || null,
+          updated: f.updated || null,
+          dueDate: f.duedate || null,
+          originalEstimate: toHours(tt.originalEstimateSeconds),
+          timeSpent: toHours(tt.timeSpentSeconds),
+          remainingEstimate: toHours(tt.remainingEstimateSeconds),
+          epicKey: f.parent?.key || null,
+          epicName: f.parent?.fields?.summary || null,
+          comments,
+        }, 200, cors);
+      }
+
+      return json({ error: 'Not found. Use /board, /sprints, /sprint/:id, /all, /epics, /epic/:key, or /issue/:key' }, 404, cors);
 
     } catch (error) {
       return json({ error: error.message }, 500, cors);
@@ -356,6 +413,56 @@ async function jiraFetch(url, headers) {
 
 function toHours(sec) {
   return Math.round(((Number(sec) || 0) / 3600) * 100) / 100;
+}
+
+// Flatten Atlassian Document Format (ADF) into readable plain text. Jira REST
+// API v3 returns description/comment bodies as ADF JSON; we walk the node tree
+// and join text, inserting line breaks for block-level nodes and list markers.
+function adfToText(node) {
+  if (!node) return '';
+  if (typeof node === 'string') return node;
+
+  const lines = [];
+
+  function walk(n, listPrefix) {
+    if (!n || typeof n !== 'object') return;
+    const type = n.type;
+
+    if (type === 'text') {
+      lines.push(n.text || '');
+      return;
+    }
+    if (type === 'hardBreak') {
+      lines.push('\n');
+      return;
+    }
+    if (type === 'listItem') {
+      lines.push(`\n${listPrefix || '• '}`);
+      (n.content || []).forEach((c) => walk(c, listPrefix));
+      return;
+    }
+    if (type === 'bulletList') {
+      (n.content || []).forEach((c) => walk(c, '• '));
+      lines.push('\n');
+      return;
+    }
+    if (type === 'orderedList') {
+      let i = 1;
+      (n.content || []).forEach((c) => walk(c, `${i++}. `));
+      lines.push('\n');
+      return;
+    }
+    if (type === 'paragraph' || type === 'heading') {
+      (n.content || []).forEach((c) => walk(c, listPrefix));
+      lines.push('\n');
+      return;
+    }
+    // Generic container (doc, blockquote, panel, tableCell, etc.)
+    (n.content || []).forEach((c) => walk(c, listPrefix));
+  }
+
+  walk(node, null);
+  return lines.join('').replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function statusWithCategory(name, map) {

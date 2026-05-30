@@ -1,5 +1,6 @@
 import { el } from '../dom.js';
 import { statusLabel, shortSprintName } from '../format.js';
+import { issueTypeIcon } from './issue-type-icon.js';
 
 function fmtDate(d) {
   if (!d) return '—';
@@ -28,7 +29,10 @@ export function renderEpicTasksTable({ epic }) {
   const rows = tasks.map((t) => {
     const assignee = t.assignee || { color: 'var(--ink-4, oklch(0.5 0.02 270))', initials: '?', name: 'Unassigned' };
     return el('tr', {}, [
-    el('td', {}, [el('span', { class: 'mono-key' }, [t.key])]),
+    el('td', {}, [el('span', { class: 'issue-key-cell' }, [
+      issueTypeIcon(t.type, { size: 16 }),
+      el('span', { class: 'mono-key' }, [t.key]),
+    ])]),
     el('td', { class: 'epic-task-summary' }, [t.summary]),
     el('td', {}, [el('span', { class: 'sprint-chip' }, [
       shortSprintName(t.sprintName) || '—',

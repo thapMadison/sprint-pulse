@@ -5,6 +5,7 @@ import { renderViewTabs } from '../../src/ui/components/view-tabs.js';
 import { renderSprintFilter } from '../../src/ui/components/sprint-filter.js';
 import { renderEpicFilterBar } from '../../src/ui/components/epic-filter-bar.js';
 import { renderWorkloadTable } from '../../src/ui/components/workload-table.js';
+import { renderTaskDetailPanel } from '../../src/ui/components/task-detail-panel.js';
 import { renderEpicTasksTable } from '../../src/ui/components/epic-tasks-table.js';
 import { renderEpicDetailPanel } from '../../src/ui/components/epic-detail-panel.js';
 import { renderEpicRoadmap } from '../../src/charts/epic-roadmap.js';
@@ -47,6 +48,14 @@ describe('UI components (golden master DOM)', () => {
 
   it('renderWorkloadTable', () => {
     expect(renderWorkloadTable({ sprint: activeSprint }).outerHTML).toMatchSnapshot();
+  });
+
+  it('renderTaskDetailPanel (initial, before lazy detail resolves)', () => {
+    // The extended detail (reporter/dates/labels/description/comments) loads
+    // async after this synchronous render, so the snapshot captures the
+    // skeleton state — meta grid, effort tiles and status history are immediate.
+    const node = renderTaskDetailPanel({ issue: activeSprint.issues[0], onClose: noop });
+    expect(node.outerHTML).toMatchSnapshot();
   });
 
   it('renderEpicTasksTable', () => {

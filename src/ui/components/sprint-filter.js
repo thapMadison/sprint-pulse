@@ -3,6 +3,14 @@ import { shortSprintName } from '../format.js';
 
 const STATE_ORDER = { active: 0, future: 1, closed: 2 };
 
+// Scroll the horizontal sprint list so the given tab sits in the centre.
+function centerTab(sprintList, btn) {
+  if (!btn) return;
+  requestAnimationFrame(() => {
+    sprintList.scrollLeft = btn.offsetLeft - sprintList.clientWidth / 2 + btn.offsetWidth / 2;
+  });
+}
+
 export function renderSprintFilter({ sprints, activeId, onChange }) {
   const groups = {
     active: sprints.filter((s) => s.state === 'active'),
@@ -25,17 +33,22 @@ export function renderSprintFilter({ sprints, activeId, onChange }) {
       return (b.startDate || '').localeCompare(a.startDate || '');
     });
 
+    let activeBtn = null;
     for (const sp of sorted) {
       const shortName = shortSprintName(sp.name);
       const btn = el('button', {
         class: `sprint-tab ${activeId === sp.id ? 'active' : ''}`,
+        'data-sprint-id': sp.id,
         onClick: () => onChange(sp.id),
       }, [
         el('span', { class: `state-dot ${sp.state || 'closed'}` }),
         shortName,
       ]);
+      if (activeId === sp.id) activeBtn = btn;
       sprintList.appendChild(btn);
     }
+
+    centerTab(sprintList, activeBtn);
   }
 
   function renderStateButtons() {
@@ -88,4 +101,19 @@ export function renderSprintFilter({ sprints, activeId, onChange }) {
       scrollLeft, sprintList, scrollRight,
     ]),
   ]);
+}
+
+// Move the active-tab highlight in place, without rebuilding the filter — so the
+// state-filter pill selection and the horizontal scroll position are preserved.
+// Re-centres the newly active tab. Safe no-op when the filter isn't mounted.
+export function updateSprintFilterActive(activeId) {
+  const sprintList = document.querySelector('.sprint-filter-container .sprint-list');
+  if (!sprintList) return;
+  const prev = sprintList.querySelector('.sprint-tab.active');
+  if (prev) prev.classList.remove('active');
+  const next = sprintList.querySelector(`.sprint-tab[data-sprint-id="${activeId}"]`);
+  if (next) {
+    next.classList.add('active');
+    centerTab(sprintList, next);
+  }
 }
