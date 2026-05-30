@@ -1,0 +1,7 @@
+# Dev-only tooling — never shipped to GitHub Pages (which serves static files only).
+node_modules/
+coverage/
+
+# Editor / OS noise
+.DS_Store
+*.log

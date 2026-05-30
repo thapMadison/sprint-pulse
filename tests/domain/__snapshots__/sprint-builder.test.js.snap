@@ -1,0 +1,173 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildSprintShells > builds metadata-only shells (golden master) 1`] = `
+[
+  {
+    "endDate": "2026-05-08",
+    "goal": "",
+    "id": "sprint-23",
+    "issues": [],
+    "issuesLoaded": false,
+    "jiraId": 100,
+    "name": "Sprint 23",
+    "startDate": "2026-04-20",
+    "state": "closed",
+  },
+  {
+    "endDate": "2026-05-29",
+    "goal": "Ship",
+    "id": "sprint-24",
+    "issues": [],
+    "issuesLoaded": false,
+    "jiraId": 101,
+    "name": "Sprint 24",
+    "startDate": "2026-05-11",
+    "state": "active",
+  },
+]
+`;
+
+exports[`buildSprintsFromIssues > groups, normalizes and infers (golden master) 1`] = `
+[
+  {
+    "endDate": "2026-05-22",
+    "goal": "",
+    "id": "backlog",
+    "issues": [
+      {
+        "assignee": {
+          "color": "#fb7185",
+          "id": "unassigned",
+          "initials": "NA",
+          "name": "Unassigned",
+        },
+        "epicKey": null,
+        "epicName": null,
+        "key": "ATL-3",
+        "originalEstimate": 0,
+        "priority": "Low",
+        "remainingEstimate": 0,
+        "status": "todo",
+        "statusChanges": [],
+        "statusName": "To Do",
+        "summary": "Orphan",
+        "timeSpent": 0,
+        "type": "Bug",
+      },
+    ],
+    "issuesLoaded": true,
+    "jiraId": null,
+    "name": "Backlog",
+    "startDate": "2026-05-08",
+    "state": "active",
+  },
+  {
+    "endDate": "2026-05-29",
+    "goal": "Ship it",
+    "id": "sprint-24",
+    "issues": [
+      {
+        "assignee": {
+          "color": "#a78bfa",
+          "id": "u1",
+          "initials": "LN",
+          "name": "Linh Nguyen",
+        },
+        "epicKey": "EPIC-1",
+        "epicName": "Pipeline",
+        "key": "ATL-1",
+        "originalEstimate": 8,
+        "priority": "High",
+        "remainingEstimate": 0,
+        "status": "done",
+        "statusChanges": [],
+        "statusName": "Done",
+        "summary": "First",
+        "timeSpent": 7,
+        "type": "Story",
+      },
+      {
+        "assignee": {
+          "color": "#22d3ee",
+          "id": "u2",
+          "initials": "KT",
+          "name": "Khoa Tran",
+        },
+        "epicKey": null,
+        "epicName": null,
+        "key": "ATL-2",
+        "originalEstimate": 5,
+        "priority": "Medium",
+        "remainingEstimate": 3,
+        "status": "inprogress",
+        "statusChanges": [],
+        "statusName": "In Progress",
+        "summary": "Second",
+        "timeSpent": 2,
+        "type": "Task",
+      },
+    ],
+    "issuesLoaded": true,
+    "jiraId": null,
+    "name": "Sprint 24",
+    "startDate": "2026-05-11",
+    "state": "active",
+  },
+]
+`;
+
+exports[`populateSprintIssues > fills a shell with normalized issues and flips issuesLoaded 1`] = `
+{
+  "endDate": "2026-05-29",
+  "goal": "",
+  "id": "sprint-24",
+  "issues": [
+    {
+      "assignee": {
+        "color": "#a78bfa",
+        "id": "u1",
+        "initials": "LN",
+        "name": "Linh Nguyen",
+      },
+      "epicKey": "EPIC-1",
+      "epicName": "Pipeline",
+      "key": "ATL-1",
+      "originalEstimate": 8,
+      "priority": "High",
+      "remainingEstimate": 0,
+      "status": "done",
+      "statusChanges": [],
+      "statusName": "Done",
+      "summary": "First",
+      "timeSpent": 7,
+      "type": "Story",
+    },
+    {
+      "assignee": {
+        "color": "#22d3ee",
+        "id": "u2",
+        "initials": "KT",
+        "name": "Khoa Tran",
+      },
+      "epicKey": null,
+      "epicName": null,
+      "key": "ATL-2",
+      "originalEstimate": 5,
+      "priority": "Medium",
+      "remainingEstimate": 3,
+      "status": "inprogress",
+      "statusChanges": [],
+      "statusName": "In Progress",
+      "summary": "Second",
+      "timeSpent": 2,
+      "type": "Task",
+    },
+  ],
+  "issuesError": null,
+  "issuesLoaded": true,
+  "jiraId": 1,
+  "name": "Sprint 24",
+  "startDate": "2026-05-11",
+  "state": "active",
+}
+`;

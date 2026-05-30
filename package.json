@@ -1,0 +1,17 @@
+{
+  "name": "sprint-pulse",
+  "version": "1.0.0",
+  "description": "Zero-build vanilla HTML/CSS/JS Jira analytics dashboard",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^2.1.8",
+    "jsdom": "^25.0.1",
+    "vitest": "^2.1.8"
+  }
+}

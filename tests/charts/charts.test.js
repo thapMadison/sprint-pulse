@@ -1,0 +1,44 @@
+// @vitest-environment jsdom
+import { describe, it, expect } from 'vitest';
+import { generateDailySeries } from '../../src/domain/series.js';
+import { DEMO_SPRINTS, DEMO_TODAY } from '../../src/data/demo.js';
+import { renderBurndown } from '../../src/charts/burndown.js';
+import { renderBurnup } from '../../src/charts/burnup.js';
+import { renderCFD } from '../../src/charts/cfd.js';
+import { renderControl } from '../../src/charts/control.js';
+import { renderDonut } from '../../src/charts/donut.js';
+
+const active = DEMO_SPRINTS.find((s) => s.state === 'active');
+const series = generateDailySeries(active, DEMO_TODAY);
+
+describe('chart renderers (golden master DOM)', () => {
+  it('renderBurndown', () => {
+    expect(renderBurndown(series).outerHTML).toMatchSnapshot();
+  });
+
+  it('renderBurnup', () => {
+    expect(renderBurnup(series).outerHTML).toMatchSnapshot();
+  });
+
+  it('renderCFD', () => {
+    expect(renderCFD(series).outerHTML).toMatchSnapshot();
+  });
+
+  it('renderControl', () => {
+    expect(renderControl(series).outerHTML).toMatchSnapshot();
+  });
+
+  it('renderDonut', () => {
+    const donut = renderDonut({
+      counts: { todo: 3, inprogress: 5, done: 7 },
+      hoursByStatus: { todo: 10, inprogress: 20.5, done: 30 },
+      totalIssues: 15,
+    });
+    expect(donut.outerHTML).toMatchSnapshot();
+  });
+
+  it('renderControl shows an empty state with no completed issues', () => {
+    const node = renderControl({ ...series, controlPoints: [] });
+    expect(node.textContent).toContain('No completed issues yet');
+  });
+});

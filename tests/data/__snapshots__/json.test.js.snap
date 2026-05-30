@@ -1,0 +1,30 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`parseJiraJSON > maps a Jira REST search response (golden master) 1`] = `
+[
+  {
+    "assigneeId": "acc-1",
+    "assigneeName": "Mai Pham",
+    "epicKey": "EPIC-1",
+    "epicName": "Pipeline epic",
+    "key": "ATL-9",
+    "originalEstimate": 8,
+    "priority": "High",
+    "remainingEstimate": 6,
+    "sprintEndDate": "2026-05-29",
+    "sprintGoal": "Ship it",
+    "sprintName": "Sprint 24",
+    "sprintStartDate": "2026-05-11",
+    "sprintState": "active",
+    "status": {
+      "name": "In Progress",
+      "statusCategory": {
+        "key": "indeterminate",
+      },
+    },
+    "summary": "Build pipeline",
+    "timeSpent": 2,
+    "type": "Story",
+  },
+]
+`;

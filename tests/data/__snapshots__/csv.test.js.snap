@@ -1,0 +1,66 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`parseJiraCSV > parses a standard Jira CSV export (golden master) 1`] = `
+[
+  {
+    "assigneeId": "",
+    "assigneeName": "Linh Nguyen",
+    "epicKey": "EPIC-1",
+    "epicName": null,
+    "key": "ATL-1",
+    "originalEstimate": 8,
+    "priority": "High",
+    "remainingEstimate": 6,
+    "sprintName": "Sprint 24",
+    "status": {
+      "name": "In Progress",
+      "statusCategory": {
+        "key": "indeterminate",
+      },
+    },
+    "summary": "Do a thing",
+    "timeSpent": 2,
+    "type": "Story",
+  },
+  {
+    "assigneeId": "",
+    "assigneeName": "Khoa Tran",
+    "epicKey": null,
+    "epicName": null,
+    "key": "ATL-2",
+    "originalEstimate": 12,
+    "priority": "Low",
+    "remainingEstimate": 0,
+    "sprintName": "Sprint 24",
+    "status": {
+      "name": "Done",
+      "statusCategory": {
+        "key": "done",
+      },
+    },
+    "summary": "Quoted, with comma",
+    "timeSpent": 8,
+    "type": "Task",
+  },
+  {
+    "assigneeId": "",
+    "assigneeName": "",
+    "epicKey": null,
+    "epicName": null,
+    "key": "ATL-3",
+    "originalEstimate": 0,
+    "priority": "Medium",
+    "remainingEstimate": 0,
+    "sprintName": "Sprint 24",
+    "status": {
+      "name": "To Do",
+      "statusCategory": {
+        "key": "new",
+      },
+    },
+    "summary": "Weekend work",
+    "timeSpent": 0,
+    "type": "Bug",
+  },
+]
+`;
