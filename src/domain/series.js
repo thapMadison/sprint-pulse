@@ -57,8 +57,6 @@ function buildControlPoints(issues, days, sprintStartDate) {
 
   const points = [];
   let fallbackIdx = 0; // For issues without changelog data
-  let withChangelog = 0;
-  let withoutChangelog = 0;
 
   for (const iss of doneIssues) {
     const data = getCycleTimeData(iss);
@@ -70,7 +68,6 @@ function buildControlPoints(issues, days, sprintStartDate) {
       cycleTime = data.cycleTime;
       completionDate = data.completionDate;
       startDate = data.startDate;
-      withChangelog++;
 
       // Map completion date to dayIdx (which sprint day)
       dayIdx = 0;
@@ -92,7 +89,6 @@ function buildControlPoints(issues, days, sprintStartDate) {
       cycleTime = 1 + (iss.originalEstimate || 0) * 0.1; // Estimate based on size
       completionDate = null;
       startDate = null;
-      withoutChangelog++;
       fallbackIdx++;
     }
 
@@ -106,7 +102,6 @@ function buildControlPoints(issues, days, sprintStartDate) {
     });
   }
 
-  console.log(`[Control Chart] Done issues: ${doneIssues.length}, with changelog: ${withChangelog}, without: ${withoutChangelog}`);
   return points;
 }
 
@@ -207,12 +202,6 @@ function buildBurndownBurnupFromChangelog(issues, days, elapsed, sprintState) {
   const totalDays = days.length;
   const actualRemaining = [];
   const completedLine = [];
-
-  // Get current actual remaining for the last day (ensures endpoint matches reality)
-  const currentRemaining = issues.reduce((acc, i) => acc + i.remainingEstimate, 0);
-  const currentCompleted = issues
-    .filter((i) => i.status === 'done')
-    .reduce((acc, i) => acc + i.originalEstimate, 0);
 
   for (let i = 0; i < totalDays; i++) {
     if (i >= elapsed && sprintState !== 'closed') {

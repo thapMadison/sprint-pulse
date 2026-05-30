@@ -79,6 +79,58 @@ function deriveEpicStatus(tasks) {
   return anyStarted ? 'inprogress' : 'todo';
 }
 
+function hoursByStatus(tasks, status) {
+  return tasks
+    .filter((t) => t.status === status)
+    .reduce((s, t) => s + (t.originalEstimate || 0), 0);
+}
+
+// Aggregate per-status counts/hours plus overall completion percent for an epic.
+// Percent prefers hours; falls back to issue count when no estimates exist.
+function computeProgress(tasks) {
+  const totalIssues = tasks.length;
+  const doneIssues = tasks.filter((t) => t.status === 'done').length;
+  const totalHours = tasks.reduce((s, t) => s + (t.originalEstimate || 0), 0);
+  const doneHours = hoursByStatus(tasks, 'done');
+  const percent = totalHours > 0
+    ? Math.round((doneHours / totalHours) * 100)
+    : totalIssues > 0
+      ? Math.round((doneIssues / totalIssues) * 100)
+      : 0;
+  return {
+    totalIssues, doneIssues,
+    totalHours, doneHours,
+    percent,
+    counts: {
+      todo: tasks.filter((t) => t.status === 'todo').length,
+      inprogress: tasks.filter((t) => t.status === 'inprogress').length,
+      done: doneIssues,
+    },
+    hours: {
+      todo: hoursByStatus(tasks, 'todo'),
+      inprogress: hoursByStatus(tasks, 'inprogress'),
+      done: doneHours,
+    },
+  };
+}
+
+// Epic start = earliest task start; end = latest task done — but the end date is
+// only "real" once every task is done, otherwise the epic is still in progress.
+function computeEpicDates(tasks, status) {
+  let startDate = null;
+  let endDate = null;
+  for (const t of tasks) {
+    if (t.startedDate) startDate = minDate(startDate, t.startedDate);
+    if (t.doneDate) endDate = maxDate(endDate, t.doneDate);
+  }
+  if (status !== 'done') endDate = null;
+  return { startDate, endDate };
+}
+
+function uniqueSprintIds(tasks) {
+  return Array.from(new Set(tasks.map((t) => t.sprintId).filter(Boolean)));
+}
+
 export function buildEpics(sprints, rawEpics, today) {
   // Index epic metadata by key for fast lookup
   const epicMetaByKey = new Map();
@@ -131,30 +183,8 @@ export function buildEpics(sprints, rawEpics, today) {
       : (meta?.status?.name ||
          (status === 'done' ? 'Done' : status === 'inprogress' ? 'In Progress' : 'To Do'));
 
-    // Aggregate progress
-    const totalIssues = tasks.length;
-    const doneIssues = tasks.filter((t) => t.status === 'done').length;
-    const totalHours = tasks.reduce((s, t) => s + (t.originalEstimate || 0), 0);
-    const doneHours = tasks
-      .filter((t) => t.status === 'done')
-      .reduce((s, t) => s + (t.originalEstimate || 0), 0);
-    const percent = totalHours > 0
-      ? Math.round((doneHours / totalHours) * 100)
-      : totalIssues > 0
-        ? Math.round((doneIssues / totalIssues) * 100)
-        : 0;
-
-    // Aggregate dates
-    let startDate = null;
-    let endDate = null;
-    for (const t of tasks) {
-      if (t.startedDate) startDate = minDate(startDate, t.startedDate);
-      if (t.doneDate) endDate = maxDate(endDate, t.doneDate);
-    }
-    // endDate is only "real" when ALL tasks are done; otherwise epic is in progress
-    if (status !== 'done') endDate = null;
-
-    const sprintIds = Array.from(new Set(tasks.map((t) => t.sprintId).filter(Boolean)));
+    const progress = computeProgress(tasks);
+    const { startDate, endDate } = computeEpicDates(tasks, status);
 
     epics.push({
       id: isNoEpic ? NO_EPIC_ID : key,
@@ -164,25 +194,11 @@ export function buildEpics(sprints, rawEpics, today) {
       status,
       statusName,
       tasks,
-      sprintIds,
+      sprintIds: uniqueSprintIds(tasks),
       startDate,
       endDate,
       today,
-      progress: {
-        totalIssues, doneIssues,
-        totalHours, doneHours,
-        percent,
-        counts: {
-          todo: tasks.filter((t) => t.status === 'todo').length,
-          inprogress: tasks.filter((t) => t.status === 'inprogress').length,
-          done: doneIssues,
-        },
-        hours: {
-          todo: tasks.filter((t) => t.status === 'todo').reduce((s, t) => s + (t.originalEstimate || 0), 0),
-          inprogress: tasks.filter((t) => t.status === 'inprogress').reduce((s, t) => s + (t.originalEstimate || 0), 0),
-          done: doneHours,
-        },
-      },
+      progress,
       isNoEpic,
     });
   }
@@ -248,27 +264,8 @@ export function enrichEpicWithDetail(epic, detailData, today) {
   });
 
   const epicStatus = deriveEpicStatus(tasks);
-  const totalIssues = tasks.length;
-  const doneIssues = tasks.filter((t) => t.status === 'done').length;
-  const totalHours = tasks.reduce((s, t) => s + (t.originalEstimate || 0), 0);
-  const doneHours = tasks
-    .filter((t) => t.status === 'done')
-    .reduce((s, t) => s + (t.originalEstimate || 0), 0);
-  const percent = totalHours > 0
-    ? Math.round((doneHours / totalHours) * 100)
-    : totalIssues > 0
-      ? Math.round((doneIssues / totalIssues) * 100)
-      : 0;
-
-  let startDate = null;
-  let endDate = null;
-  for (const t of tasks) {
-    if (t.startedDate) startDate = minDate(startDate, t.startedDate);
-    if (t.doneDate) endDate = maxDate(endDate, t.doneDate);
-  }
-  if (epicStatus !== 'done') endDate = null;
-
-  const sprintIds = Array.from(new Set(tasks.map((t) => t.sprintId).filter(Boolean)));
+  const progress = computeProgress(tasks);
+  const { startDate, endDate } = computeEpicDates(tasks, epicStatus);
 
   return {
     ...epic,
@@ -277,25 +274,11 @@ export function enrichEpicWithDetail(epic, detailData, today) {
     status: epicStatus,
     statusName: detailData.epic?.status?.name || epic.statusName,
     tasks,
-    sprintIds,
+    sprintIds: uniqueSprintIds(tasks),
     startDate,
     endDate,
     today,
-    progress: {
-      totalIssues, doneIssues,
-      totalHours, doneHours,
-      percent,
-      counts: {
-        todo: tasks.filter((t) => t.status === 'todo').length,
-        inprogress: tasks.filter((t) => t.status === 'inprogress').length,
-        done: doneIssues,
-      },
-      hours: {
-        todo: tasks.filter((t) => t.status === 'todo').reduce((s, t) => s + (t.originalEstimate || 0), 0),
-        inprogress: tasks.filter((t) => t.status === 'inprogress').reduce((s, t) => s + (t.originalEstimate || 0), 0),
-        done: doneHours,
-      },
-    },
+    progress,
     detailLoaded: true,
   };
 }
