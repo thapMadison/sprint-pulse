@@ -1,33 +1,11 @@
 import { el } from '../dom.js';
+import { fmtDate, fmtDow, metaItem, dayUnit } from '../hero-helpers.js';
 
-function fmtDate(d) {
-  if (!d) return '—';
-  const dt = new Date(d + 'T00:00:00');
-  return `${String(dt.getDate()).padStart(2, '0')} ${dt.toLocaleString('en', { month: 'short' })}`;
-}
-function fmtDow(d) {
-  if (!d) return '';
-  return new Date(d + 'T00:00:00').toLocaleString('en', { weekday: 'short' });
-}
 function daysBetween(a, b) {
   if (!a || !b) return 0;
   const x = new Date(a + 'T00:00:00');
   const y = new Date(b + 'T00:00:00');
   return Math.max(0, Math.round((y - x) / 86400000));
-}
-
-function metaItem(label, value, sub, valueStyle) {
-  return el('div', { class: 'meta-item' }, [
-    el('div', { class: 'meta-label' }, [label]),
-    el('div', { class: 'meta-value', style: valueStyle || null }, value),
-    el('div', { class: 'meta-sub' }, [sub]),
-  ]);
-}
-
-function dayUnit() {
-  return el('span', {
-    style: { fontSize: '13px', color: 'var(--ink-3)', marginLeft: '4px' },
-  }, ['d']);
 }
 
 function statusBadge(epic) {

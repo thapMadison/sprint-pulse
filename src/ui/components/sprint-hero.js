@@ -1,14 +1,7 @@
 import { el } from '../dom.js';
 import { svg } from '../../charts/svg.js';
 import { workingDaysBetween, workingDaysRemaining } from '../../domain/working-days.js';
-
-function fmtDate(d) {
-  const dt = new Date(d + 'T00:00:00');
-  return `${String(dt.getDate()).padStart(2, '0')} ${dt.toLocaleString('en', { month: 'short' })}`;
-}
-function fmtDow(d) {
-  return new Date(d + 'T00:00:00').toLocaleString('en', { weekday: 'short' });
-}
+import { fmtDate, fmtDow, metaItem, dayUnit } from '../hero-helpers.js';
 
 function renderGoalPopover(goalText) {
   const popover = el('div', { class: 'goal-popover' }, [
@@ -41,18 +34,6 @@ function renderGoalPopover(goalText) {
     setTimeout(() => document.addEventListener('click', close), 0);
   };
   return el('div', { class: 'goal-info-wrap' }, [btn, popover]);
-}
-
-function dayUnit() {
-  return el('span', { style: { fontSize: '13px', color: 'var(--ink-3)', marginLeft: '4px' } }, ['d']);
-}
-
-function metaItem(label, value, sub, valueStyle) {
-  return el('div', { class: 'meta-item' }, [
-    el('div', { class: 'meta-label' }, [label]),
-    el('div', { class: 'meta-value', style: valueStyle || null }, value),
-    el('div', { class: 'meta-sub' }, [sub]),
-  ]);
 }
 
 function statTile({ label, hours, totalEst, accentBg, extra }) {

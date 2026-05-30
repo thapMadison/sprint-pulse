@@ -4,6 +4,7 @@
 // - Click chevron to expand an epic and reveal its task rows underneath.
 // - Click epic name to open the side detail panel.
 import { el } from '../ui/dom.js';
+import { shortSprintName } from '../ui/format.js';
 
 const MIN_PX_PER_DAY = 6;
 const MAX_PX_PER_DAY = 22;
@@ -188,7 +189,7 @@ function sprintBands(sprints, dayToPct, rightTrackPx) {
     const widthPx = (width / 100) * rightTrackPx;
     const stateCls = sp.state === 'active' ? 'active'
       : sp.state === 'closed' ? 'closed' : 'future';
-    const shortName = (sp.name || '').split(' — ')[0] || sp.name;
+    const shortName = shortSprintName(sp.name);
     const showLabel = sp.state === 'active' || widthPx >= SPRINT_LABEL_MIN_PX;
     const labelText = shortSprintLabel(shortName);
 

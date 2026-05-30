@@ -1,11 +1,6 @@
 import { el } from '../dom.js';
 import { svg } from '../../charts/svg.js';
-
-const STATUS_LABEL = { inprogress: 'In Prog', todo: 'To Do', done: 'Done' };
-
-function statusLabel(iss) {
-  return iss.statusName || STATUS_LABEL[iss.status] || 'Done';
-}
+import { statusLabel } from '../format.js';
 
 function renderIssueRow(iss) {
   return el('div', { class: 'issue-row' }, [

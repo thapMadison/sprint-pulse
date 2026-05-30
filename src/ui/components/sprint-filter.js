@@ -1,4 +1,5 @@
 import { el } from '../dom.js';
+import { shortSprintName } from '../format.js';
 
 const STATE_ORDER = { active: 0, future: 1, closed: 2 };
 
@@ -25,7 +26,7 @@ export function renderSprintFilter({ sprints, activeId, onChange }) {
     });
 
     for (const sp of sorted) {
-      const shortName = sp.name.split(' — ')[0] || sp.name;
+      const shortName = shortSprintName(sp.name);
       const btn = el('button', {
         class: `sprint-tab ${activeId === sp.id ? 'active' : ''}`,
         onClick: () => onChange(sp.id),

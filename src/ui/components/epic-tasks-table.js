@@ -1,15 +1,10 @@
 import { el } from '../dom.js';
-
-const STATUS_LABEL = { inprogress: 'In Prog', todo: 'To Do', done: 'Done' };
+import { statusLabel, shortSprintName } from '../format.js';
 
 function fmtDate(d) {
   if (!d) return '—';
   const dt = new Date(d + 'T00:00:00');
   return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`;
-}
-
-function statusLabel(iss) {
-  return iss.statusName || STATUS_LABEL[iss.status] || 'Done';
 }
 
 export function renderEpicTasksTable({ epic }) {
@@ -36,7 +31,7 @@ export function renderEpicTasksTable({ epic }) {
     el('td', {}, [el('span', { class: 'mono-key' }, [t.key])]),
     el('td', { class: 'epic-task-summary' }, [t.summary]),
     el('td', {}, [el('span', { class: 'sprint-chip' }, [
-      (t.sprintName || '').split(' — ')[0] || t.sprintName || '—',
+      shortSprintName(t.sprintName) || '—',
     ])]),
     el('td', {}, [
       el('div', { class: 'user-cell-mini' }, [

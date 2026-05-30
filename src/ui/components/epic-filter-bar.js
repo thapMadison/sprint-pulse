@@ -1,4 +1,5 @@
 import { el } from '../dom.js';
+import { shortSprintName } from '../format.js';
 
 const STATUS_OPTIONS = [
   { value: 'all',        label: 'All' },
@@ -28,7 +29,7 @@ export function renderEpicFilterBar({
     el('option', { value: 'all' }, ['All sprints']),
     ...sprints.map((sp) =>
       el('option', { value: sp.id, ...(filters.sprintId === sp.id ? { selected: 'selected' } : {}) },
-        [(sp.name || '').split(' — ')[0] || sp.name])
+        [shortSprintName(sp.name)])
     ),
   ]);
   if (filters.sprintId !== 'all') sprintSelect.value = filters.sprintId;
