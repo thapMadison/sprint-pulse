@@ -1,18 +1,18 @@
 # Repository Guidelines
 
-Sprint Pulse is a zero-build, vanilla HTML/CSS/JS Jira analytics dashboard. There is no bundler, no package manager, and no test runner — every file under `src/` is shipped as-is to the browser as an ES module.
+Sprint Pulse is a zero-build, vanilla HTML/CSS/JS Jira analytics dashboard. Every file under `src/` is shipped as-is to the browser as an ES module — no bundler, no transpile step. The only tooling is a **dev-only** test runner (Vitest); `package.json` and `node_modules` are never deployed (GitHub Pages serves the static files only).
 
 ## Project Structure & Module Organization
 
 `index.html` is the only entry point; it loads `src/app/main.js`. Modules are layered around a single shared shape — a `Sprint` with normalized `issues[]` (and a derived `Epic` built from those issues).
 
-- `src/app/` — bootstrap and orchestration. `state.js` holds the single mutable `state` plus `setState` / `subscribe`; `render.js` re-renders into `#root` on every change; `actions.js` is the only place side-effects (auth, fetching, parsing, persistence) live.
+- `src/app/` — bootstrap and orchestration. `state.js` holds the single mutable `state` plus `setState` / `subscribe`, and a `createChannel()` factory backing the scoped setters (`setEpicViewState`, `setSprintViewState`, …) that repaint one region in isolation; `render.js` re-renders into `#root` on every change; `actions.js` is the only place side-effects (auth, fetching, parsing, persistence) live.
 - `src/data/parsers/` — file adapters. `csv.js` (Jira CSV export, RFC-4180-ish), `xml.js` (Jira RSS/XML via `DOMParser`), `json.js` (REST search response or pre-shaped). `index.js` dispatches by extension. `demo.js` (in `src/data/`) provides the bundled fixture.
-- `src/services/` — external integrations. `jira-api.js` talks **only** to the Cloudflare Worker proxy (never directly to Atlassian); `auth.js` lazy-loads the Firebase SDK and handles Microsoft sign-in + App Check; `firebase-config.js` holds public config.
+- `src/services/` — external integrations. `jira-api.js` talks **only** to the Cloudflare Worker proxy (never directly to Atlassian); `auth.js` lazy-loads the Firebase SDK and handles Microsoft sign-in + App Check; `firebase-config.js` holds public config; `data-cache.js` caches loaded data per source in an in-memory `Map` plus IndexedDB (namespaced `u:<uid>:…` while signed in) so switching sources or refreshing avoids re-fetching.
 - `src/domain/` — pure logic. `status.js` collapses `statusCategory` → `todo|inprogress|done` (name-based fallback for CSV); `working-days.js` excludes Sat/Sun; `series.js` produces the daily series for every chart; `sprint-builder.js` and `epic-builder.js` group raw issues into the normalized shapes.
-- `src/charts/` — SVG renderers. `svg.js` is the shared `svg()` / `path()` / `smoothPath()` helper; each chart file (`burndown`, `burnup`, `cfd`, `control`, `donut`, `epic-timeline`) returns a detached DOM node.
-- `src/ui/` — `dom.js` exports the `el()` helper used everywhere; `chart-helpers.js` holds shared axis/scale utilities; `components/` exports one `renderX()` function per file.
-- `cloudflare-worker/` — Worker proxy (`worker-dashboard.js` + `wrangler.toml`) that holds Jira credentials and exposes `/all`, `/sprint/:id`, `/sprints`, `/epics`, `/epic/:key`. The browser only knows the Worker URL plus `boardId`.
+- `src/charts/` — SVG renderers. `svg.js` is the shared `svg()` / `path()` / `smoothPath()` helper; each chart file (`burndown`, `burnup`, `cfd`, `control`, `donut`, `epic-roadmap`) returns a detached DOM node. `burndown`/`burnup` are thin configs over the shared `area-line-chart.js` renderer.
+- `src/ui/` — `dom.js` exports the `el()` helper used everywhere; `chart-helpers.js` holds shared axis/scale utilities; `hero-helpers.js` holds the date/meta cells shared by the Sprint and Epic hero cards; `format.js` holds shared label helpers (`statusLabel`, `shortSprintName`); `components/` exports one `renderX()` function per file.
+- `cloudflare-worker/` — Worker proxy (`worker-dashboard.js` + `wrangler.toml`) that holds Jira credentials and exposes `/board`, `/sprints`, `/sprint/:id`, `/all`, `/epics`, `/epic/:key`. The browser only knows the Worker URL plus `boardId`.
 
 `assets/styles.css` is the design-system port (treat as 1-for-1 with the source design); `assets/extras.css` is reserved for additions that don't belong in the ported file.
 
@@ -25,6 +25,15 @@ python -m http.server 8080      # then open http://localhost:8080
 # or: npx serve, php -S localhost:8080
 ```
 
+Run the test suite (requires `npm install` once for the dev dependencies):
+
+```
+npm test                        # run once
+npm run test:watch              # watch mode
+npm run coverage                # v8 coverage report
+npx vitest run tests/domain/series.test.js   # a single file
+```
+
 Deploy / iterate on the Jira proxy:
 
 ```
@@ -34,7 +43,9 @@ wrangler dev                    # local Worker at http://localhost:8787
 wrangler deploy                 # publish
 ```
 
-No automated tests exist; verify changes manually by exercising all four data paths (Demo, Jira API via Worker, file import for CSV/XML/JSON) and both views (Sprint, Epic).
+## Testing Guidelines
+
+Tests live in `tests/`, mirroring `src/`, named `*.test.js`. Vitest runs in Node for pure logic; files that build DOM (charts, components) or need `DOMParser` (`xml.js`) opt in with a `// @vitest-environment jsdom` header (see `tests/charts/`, `tests/ui/`, `tests/data/xml.test.js`). Coverage spans the pure layers (`domain/`, all `data/parsers/`, `app/state.js`) plus golden-master snapshots of every chart, hero and component's DOM output; only the network/Firebase services (`jira-api.js`, `auth.js`, `data-cache.js`) and event-handler behavior are left to manual testing. When refactoring a covered area, the rule is **tests stay green with no snapshot changes** — a changed snapshot means behavior changed, so confirm it was intended (`npx vitest -u` to accept). After touching the IO/event layers, still do a manual smoke pass: exercise all four data paths (Demo, Jira API via Worker, file import for CSV/XML/JSON) and both views (Sprint, Epic).
 
 ## Coding Style & Naming Conventions
 
