@@ -13,10 +13,48 @@ import {
   fetchSprintFromWorker, fetchSprintListFromWorker, fetchBoardFromWorker,
   fetchEpicsFromWorker, fetchEpicIssuesFromWorker,
 } from '../services/jira-api.js';
-import { setState, setStateSilent, setEpicRoadmapState, setEpicViewState, setSprintViewState, setLoadProgressState, setDataSourceState, getState } from './state.js';
+import { setState, setStateSilent, setEpicRoadmapState, setEpicViewState, setSprintViewState, setLoadProgressState, setDataSourceState, getState, DEFAULT_EPIC_FILTERS } from './state.js';
 import { DEMO_EPICS } from '../data/demo.js';
 
 const BOARD_ID_KEY = 'jira_board_id';
+
+// ─────────────────────────── state reset shapes ───────────────────────────
+// Centralized "reset" slices so the demo defaults and the Epic-view reset shape
+// are defined once and stay in sync across logout / load / refresh / restore.
+
+// The default demo source — shown on first load and after logout.
+function demoSourceState() {
+  return {
+    sprints: DEMO_SPRINTS,
+    activeSprintId: 'sp-24',
+    today: DEMO_TODAY,
+    sourceKey: 'demo',
+    sourceId: null,
+    sourceLabel: 'Demo · synced',
+    lastUpdated: null,
+  };
+}
+
+// Epic data slice reset to "nothing loaded" — the tab rebuilds when next opened.
+function freshEpicData() {
+  return {
+    epics: [],
+    rawEpics: [],
+    activeEpicId: null,
+    epicLoadProgress: null,
+    epicError: null,
+  };
+}
+
+// Epic UI slice reset (expansion, open detail, filters) — kept separate because
+// some flows reset the UI but keep cached/derived epic data (e.g. restore).
+function freshEpicUi() {
+  return {
+    expandedEpicIds: new Set(),
+    epicDetailId: null,
+    epicFilters: { ...DEFAULT_EPIC_FILTERS },
+  };
+}
 
 // ─────────────────────────── data-source cache ───────────────────────────
 // Snapshot/restore the data-bearing slice of state per source so switching
@@ -73,9 +111,7 @@ function restoreSnapshot(snap, extra = {}) {
     epicLoadProgress: null,
     epicError: null,
     activeEpicId: (snap.epics && snap.epics[0]?.id) || null,
-    expandedEpicIds: new Set(),
-    epicDetailId: null,
-    epicFilters: { status: 'all', sprintId: 'all', search: '' },
+    ...freshEpicUi(),
     ...extra,
   });
   // Only rebuild epics if none were cached — otherwise we'd discard the cached
@@ -409,27 +445,15 @@ export async function logout() {
     cache.clearLastSource();
     setState({
       user: null,
-      sprints: DEMO_SPRINTS,
-      activeSprintId: 'sp-24',
-      today: DEMO_TODAY,
-      sourceKey: 'demo',
-      sourceId: null,
-      sourceLabel: 'Demo · synced',
-      lastUpdated: null,
+      ...demoSourceState(),
       error: null,
       isRefreshing: false,
       apiPanelOpen: false,
       pendingBoardId: '',
       loadProgress: null,
       view: 'sprint',
-      epics: [],
-      rawEpics: [],
-      activeEpicId: null,
-      epicLoadProgress: null,
-      epicError: null,
-      expandedEpicIds: new Set(),
-      epicDetailId: null,
-      epicFilters: { status: 'all', sprintId: 'all', search: '' },
+      ...freshEpicData(),
+      ...freshEpicUi(),
     });
   } catch (e) {
     setState({ error: `Logout failed: ${e.message}` });
@@ -440,21 +464,11 @@ export function loadDemo() {
   // Preserve the source we're leaving so switching back to it is instant.
   persistCurrent();
   setState({
-    sprints: DEMO_SPRINTS,
-    activeSprintId: 'sp-24',
-    today: DEMO_TODAY,
-    sourceKey: 'demo',
-    sourceId: null,
-    sourceLabel: 'Demo · synced',
-    lastUpdated: null,
+    ...demoSourceState(),
     error: null,
     isRefreshing: false,
     apiPanelOpen: false,
-    epics: [],
-    rawEpics: [],
-    activeEpicId: null,
-    epicLoadProgress: null,
-    epicError: null,
+    ...freshEpicData(),
   });
   // Record demo as the active source (pointer only — demo carries no data).
   cache.setLastSource(sourceDescriptor());
@@ -600,15 +614,9 @@ function applyLoadedSprints(sprints, sourceLabel, sourceKey, extra = {}) {
     lastUpdated: new Date(),
     error: null,
     isRefreshing: false,
-    // Reset epic-derived state — will rebuild next time user enters Epic tab
-    epics: [],
-    rawEpics: [],
-    activeEpicId: null,
-    epicLoadProgress: null,
-    epicError: null,
-    expandedEpicIds: new Set(),
-    epicDetailId: null,
-    epicFilters: { status: 'all', sprintId: 'all', search: '' },
+    // Reset epic-derived state — will rebuild next time user enters Epic tab.
+    ...freshEpicData(),
+    ...freshEpicUi(),
     ...extra,
   });
 }

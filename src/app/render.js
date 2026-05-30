@@ -20,7 +20,7 @@ import { renderControl } from '../charts/control.js';
 import { renderDonut } from '../charts/donut.js';
 import { renderEpicRoadmap } from '../charts/epic-roadmap.js';
 
-import { getState, activeSprint } from './state.js';
+import { getState, activeSprint, DEFAULT_EPIC_FILTERS } from './state.js';
 import {
   login, logout, setActiveSprint, setView,
   toggleEpicExpanded, openEpicDetail, closeEpicDetail,
@@ -369,7 +369,7 @@ function renderEpicView() {
     onStatusChange: (v) => setEpicFilter({ status: v }),
     onSprintChange: (v) => setEpicFilter({ sprintId: v }),
     onSearchInput: (v) => setEpicSearchSilent(v),
-    onClearAll: () => setEpicFilter({ status: 'all', sprintId: 'all', search: '' }),
+    onClearAll: () => setEpicFilter({ ...DEFAULT_EPIC_FILTERS }),
   }));
 
   children.push(el('div', { id: 'epic-roadmap-mount' }, [buildRoadmap(s)]));
