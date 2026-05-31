@@ -18,13 +18,6 @@ async function workerGet(workerUrl, path) {
   return res.json();
 }
 
-export async function fetchAllFromWorker(workerUrl, boardId) {
-  const path = boardId
-    ? `/all?boardId=${encodeURIComponent(boardId)}`
-    : `/all`;
-  return workerGet(workerUrl, path);
-}
-
 // Fetch single sprint with changelog. Used for CFD when user switches sprint.
 export async function fetchSprintFromWorker(workerUrl, sprintId, boardId) {
   const path = `/sprint/${encodeURIComponent(sprintId)}?boardId=${encodeURIComponent(boardId)}`;

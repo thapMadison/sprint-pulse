@@ -40,19 +40,22 @@ function iconEpic(gradId = 'vtGradEpic') {
 
 export { iconSprint, iconEpic };
 
-export function renderViewTabs({ active, onChange }) {
-  const tab = (key, label, icon) => {
-    const btn = el('button', {
-      class: `view-tab ${active === key ? 'active' : ''}`,
-      type: 'button',
-      onClick: () => onChange(key),
-    }, [label]);
-    btn.insertBefore(icon, btn.firstChild);
-    return btn;
-  };
+// One Sprint/Epic tab button. `data-key` lets in-place updates target a tab by
+// identity instead of DOM position. Shared by the in-flow tabs and the FAB.
+export function renderTabBtn({ key, label, icon, active, onChange }) {
+  const btn = el('button', {
+    class: `view-tab ${active === key ? 'active' : ''}`,
+    type: 'button',
+    'data-key': key,
+    onClick: () => onChange(key),
+  }, [label]);
+  btn.insertBefore(icon, btn.firstChild);
+  return btn;
+}
 
+export function renderViewTabs({ active, onChange }) {
   return el('div', { class: 'view-tabs' }, [
-    tab('sprint', 'Sprint', iconSprint()),
-    tab('epic', 'Epic', iconEpic()),
+    renderTabBtn({ key: 'sprint', label: 'Sprint', icon: iconSprint(), active, onChange }),
+    renderTabBtn({ key: 'epic', label: 'Epic', icon: iconEpic(), active, onChange }),
   ]);
 }

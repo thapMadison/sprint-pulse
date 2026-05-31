@@ -114,10 +114,6 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
 
   const tbody = el('tbody', {}, []);
 
-  function openDetail(issue) {
-    if (onOpenTask) onOpenTask(issue);
-  }
-
   function renderBody() {
     tbody.innerHTML = '';
 
@@ -148,7 +144,7 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
           el('div', { class: 'user-cell' }, [
             el('div', {
               class: 'avatar',
-              style: { background: row.user.color, color: 'oklch(0.2 0.02 270)' },
+              style: { background: row.user.color },
             }, [row.user.initials]),
             el('div', {}, [
               el('div', { class: 'name' }, [row.user.name]),
@@ -188,7 +184,7 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
           el('td', { colSpan: 6 }, [
             el('div', { class: 'issue-list' }, [
               renderIssueListHeader(),
-              ...matchingIssues.map((iss) => renderIssueRow(iss, openDetail, jiraUrl)),
+              ...matchingIssues.map((iss) => renderIssueRow(iss, () => onOpenTask?.(iss), jiraUrl)),
             ]),
           ]),
         ]));
@@ -220,14 +216,7 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
   return el('div', { class: 'card' }, [
     el('h3', { class: 'card-title' }, [
       el('span', {}, ['User Workload Report']),
-      el('span', {
-        style: {
-          font: '400 11px var(--font-mono)',
-          color: 'var(--ink-3)',
-          letterSpacing: '0.05em',
-          textTransform: 'none',
-        },
-      }, [`${allRows.length} contributors · click a task for details`]),
+      el('span', { class: 'card-subtitle' }, [`${allRows.length} contributors · click a task for details`]),
     ]),
     searchBox,
     el('table', { class: 'workload-table' }, [

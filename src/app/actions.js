@@ -15,6 +15,7 @@ import {
 } from '../services/jira-api.js';
 import { setState, setStateSilent, setEpicRoadmapState, setEpicViewState, setSprintViewState, setLoadProgressState, setDataSourceState, getState, DEFAULT_EPIC_FILTERS } from './state.js';
 import { DEMO_EPICS } from '../data/demo.js';
+import { VIEW, SOURCE } from './constants.js';
 
 const BOARD_ID_KEY = 'jira_board_id';
 
@@ -28,7 +29,7 @@ function demoSourceState() {
     sprints: DEMO_SPRINTS,
     activeSprintId: 'sp-24',
     today: DEMO_TODAY,
-    sourceKey: 'demo',
+    sourceKey: SOURCE.DEMO,
     sourceId: null,
     sourceLabel: 'Demo · synced',
     lastUpdated: null,
@@ -138,7 +139,7 @@ export function setActiveSprint(id) {
   // (filter highlight + charts/skeleton) instead of re-rendering the whole page.
   setSprintViewState({ activeSprintId: id });
   // Lazy-load this sprint's issues + changelog the first time it's viewed.
-  if (getState().sourceKey === 'api') {
+  if (getState().sourceKey === SOURCE.API) {
     loadSprintDetail(id).catch((e) => {
       console.warn('[Sprint] detail load failed:', e);
     });
@@ -200,7 +201,7 @@ export function setApiPanelOpen(open) {
 export function setView(view) {
   if (view !== 'sprint' && view !== 'epic') return;
   setState({ view });
-  if (view === 'epic' && getState().epics.length === 0) {
+  if (view === VIEW.EPIC && getState().epics.length === 0) {
     loadEpicsAndChangelogs().catch((e) => {
       console.warn('[Epic] load failed:', e);
     });
@@ -249,7 +250,7 @@ async function loadEpicsAndChangelogs() {
   const source = s.sourceKey;
 
   // Demo mode: build from already-present statusChanges + DEMO_EPICS (all detail available)
-  if (source === 'demo') {
+  if (source === SOURCE.DEMO) {
     const epics = buildLightweightEpics(s.sprints, DEMO_EPICS, s.today)
       .map((e) => ({ ...e, detailLoaded: true }));
     setEpicViewState({
@@ -264,7 +265,7 @@ async function loadEpicsAndChangelogs() {
   }
 
   // File mode: no API available, build from parsed epicKey (all detail we have)
-  if (source === 'file') {
+  if (source === SOURCE.FILE) {
     const epics = buildLightweightEpics(s.sprints, [], s.today)
       .map((e) => ({ ...e, detailLoaded: true }));
     setEpicViewState({
@@ -368,7 +369,7 @@ async function loadEpicsAndChangelogs() {
 // is currently on that tab, rebuild now — switching tabs is what normally
 // triggers the load, but the tab didn't change so we trigger it explicitly.
 function reloadEpicsIfActive() {
-  if (getState().view === 'epic') {
+  if (getState().view === VIEW.EPIC) {
     loadEpicsAndChangelogs().catch((e) => {
       console.warn('[Epic] reload after data load failed:', e);
     });
@@ -462,7 +463,7 @@ export async function logout() {
       apiPanelOpen: false,
       pendingBoardId: '',
       loadProgress: null,
-      view: 'sprint',
+      view: VIEW.SPRINT,
       ...freshEpicData(),
       ...freshEpicUi(),
     });
@@ -509,6 +510,41 @@ export async function loadFromFile(file) {
   }
 }
 
+// Shared body of the API load + refresh flows: connect → fetch board+sprints →
+// build shells → load the active sprint's issues → persist → finish. The two
+// callers differ only in their applyLoadedSprints extras and which sprint stays
+// active afterwards, passed in via `opts`.
+async function fetchAndApplyBoard(boardId, { extra = {}, keepActiveId = null } = {}) {
+  setProgress('connect', 'api');
+  const workerUrl = await getWorkerUrl();
+  if (!workerUrl) throw new Error('Worker URL not configured in Firebase database.');
+  const jiraUrl = await getJiraUrl().catch(() => null);
+
+  localStorage.setItem(BOARD_ID_KEY, boardId);
+  setProgress('fetch');
+  // Board name (for the label) + sprint list in parallel. Board name is
+  // best-effort; fall back to the id on failure.
+  const [board, rawSprints] = await Promise.all([
+    fetchBoardFromWorker(workerUrl, boardId).catch(() => null),
+    fetchSprintListFromWorker(workerUrl, boardId),
+  ]);
+  if (!rawSprints || !rawSprints.length) {
+    throw new Error('No sprints found. Check Board ID and Worker configuration.');
+  }
+
+  setProgress('process');
+  const sprints = buildSprintShells(rawSprints, getState().today);
+  applyLoadedSprints(sprints, apiSourceLabel(board, boardId), 'api', { sourceId: boardId, jiraUrl, ...extra });
+  // Keep the user on the sprint they were viewing if it still exists.
+  if (keepActiveId && sprints.some((sp) => sp.id === keepActiveId)) {
+    setStateSilent({ activeSprintId: keepActiveId });
+  }
+  await loadSprintDetail(getState().activeSprintId);
+  persistCurrent();
+  await finishProgress();
+  reloadEpicsIfActive();
+}
+
 export async function loadFromApi(boardId) {
   if (!boardId) {
     showError('Please enter your Jira Board ID.');
@@ -520,7 +556,7 @@ export async function loadFromApi(boardId) {
   // If this board was already loaded this session (or on a previous visit),
   // restore it instantly and skip every network round-trip. Use Refresh to pull
   // fresh data.
-  const cacheKey = cache.cacheKeyFor({ sourceKey: 'api', sourceId: boardId, uid: cache.userScope() });
+  const cacheKey = cache.cacheKeyFor({ sourceKey: SOURCE.API, sourceId: boardId, uid: cache.userScope() });
   if (cacheKey) {
     const snap = await cache.getCached(cacheKey);
     if (snap && snap.sprints && snap.sprints.length) {
@@ -533,31 +569,7 @@ export async function loadFromApi(boardId) {
   }
 
   try {
-    setProgress('connect', 'api');
-    const workerUrl = await getWorkerUrl();
-    if (!workerUrl) throw new Error('Worker URL not configured in Firebase database.');
-    const jiraUrl = await getJiraUrl().catch(() => null);
-
-    localStorage.setItem(BOARD_ID_KEY, boardId);
-    setProgress('fetch');
-    // Step 1: board name (for the label) + sprint list, in parallel → render the
-    // filter immediately. Board name is best-effort; fall back to the id on failure.
-    const [board, rawSprints] = await Promise.all([
-      fetchBoardFromWorker(workerUrl, boardId).catch(() => null),
-      fetchSprintListFromWorker(workerUrl, boardId),
-    ]);
-    if (!rawSprints || !rawSprints.length) {
-      throw new Error('No sprints found. Check Board ID and Worker configuration.');
-    }
-
-    setProgress('process');
-    const sprints = buildSprintShells(rawSprints, getState().today);
-    applyLoadedSprints(sprints, apiSourceLabel(board, boardId), 'api', { apiPanelOpen: false, sourceId: boardId, jiraUrl });
-    // Step 2: load only the default (active) sprint's issues for the first paint.
-    await loadSprintDetail(getState().activeSprintId);
-    persistCurrent();
-    await finishProgress();
-    reloadEpicsIfActive();
+    await fetchAndApplyBoard(boardId, { extra: { apiPanelOpen: false } });
     return true;
   } catch (e) {
     setProgress(null);
@@ -580,31 +592,7 @@ export async function refreshFromApi() {
 
   setState({ isRefreshing: true });
   try {
-    setProgress('connect', 'api');
-    const workerUrl = await getWorkerUrl();
-    if (!workerUrl) throw new Error('Worker URL not configured in Firebase.');
-    const jiraUrl = await getJiraUrl().catch(() => null);
-    setProgress('fetch');
-    const [board, rawSprints] = await Promise.all([
-      fetchBoardFromWorker(workerUrl, boardId).catch(() => null),
-      fetchSprintListFromWorker(workerUrl, boardId),
-    ]);
-    if (!rawSprints || !rawSprints.length) {
-      throw new Error('No sprints found. Check Worker environment variables and Board ID.');
-    }
-
-    setProgress('process');
-    const prevActive = getState().activeSprintId;
-    const sprints = buildSprintShells(rawSprints, getState().today);
-    applyLoadedSprints(sprints, apiSourceLabel(board, boardId), 'api', { sourceId: boardId, jiraUrl });
-    // Keep the user on the sprint they were viewing if it still exists.
-    if (sprints.some((sp) => sp.id === prevActive)) {
-      setStateSilent({ activeSprintId: prevActive });
-    }
-    await loadSprintDetail(getState().activeSprintId);
-    persistCurrent();
-    await finishProgress();
-    reloadEpicsIfActive();
+    await fetchAndApplyBoard(boardId, { keepActiveId: getState().activeSprintId });
   } catch (e) {
     setProgress(null);
     showError(e.message || String(e));
@@ -655,7 +643,7 @@ export async function restoreLastSource(user) {
   if (_bootRestoreDone) return;
 
   const pointer = cache.getLastSource();
-  if (!pointer || pointer.sourceKey === 'demo') { _bootRestoreDone = true; return; }
+  if (!pointer || pointer.sourceKey === SOURCE.DEMO) { _bootRestoreDone = true; return; }
 
   // api/file data is namespaced per user — only restore for its owner.
   if (!user) return; // auth still resolving; wait for the next callback
@@ -666,7 +654,7 @@ export async function restoreLastSource(user) {
   const snap = await cache.getCached(key);
   if (!snap || !snap.sprints || !snap.sprints.length) return;
 
-  if (pointer.sourceKey === 'api' && pointer.sourceId) {
+  if (pointer.sourceKey === SOURCE.API && pointer.sourceId) {
     localStorage.setItem(BOARD_ID_KEY, pointer.sourceId);
   }
   restoreSnapshot(snap);

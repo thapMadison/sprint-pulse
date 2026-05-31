@@ -1,35 +1,10 @@
 import { el } from '../dom.js';
-import { statusLabel } from '../format.js';
+import { statusLabel, fmtDateSlash, fmtDateTime, initials } from '../format.js';
 import { normalizeStatus, extractStatusName } from '../../domain/status.js';
 import { issueTypeIcon, issueTypeBadge } from './issue-type-icon.js';
+import { renderUserCell } from './user-cell.js';
+import { renderPanelShell } from './panel-shell.js';
 import { fetchTaskDetail } from '../../app/actions.js';
-
-function fmtDate(d) {
-  if (!d) return '—';
-  const dt = new Date(d.length <= 10 ? d + 'T00:00:00' : d);
-  if (Number.isNaN(dt.getTime())) return '—';
-  return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${dt.getFullYear()}`;
-}
-
-function fmtDateTime(d) {
-  if (!d) return '—';
-  const dt = new Date(d);
-  if (Number.isNaN(dt.getTime())) return fmtDate(d);
-  const date = `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}/${dt.getFullYear()}`;
-  const time = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
-  return `${date} ${time}`;
-}
-
-function hours(h) {
-  return `${(Number(h) || 0).toFixed(1)}h`;
-}
-
-function initialsOf(name) {
-  if (!name) return '?';
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
 
 // One labelled meta field (label above value). Returns { field, valueEl } so
 // callers can replace the skeleton with real data without touching the layout.
@@ -55,17 +30,6 @@ function metaField(label, valueNode, { wide = false, span2 = false, span3 = fals
 // Shimmer placeholder while lazy data is in flight.
 function fieldSkeleton() {
   return el('span', { class: 'task-detail-skeleton' });
-}
-
-// Avatar + name chip.
-function userCell(name, color) {
-  return el('div', { class: 'user-cell-mini' }, [
-    el('div', {
-      class: 'avatar-mini',
-      style: { background: color, color: 'oklch(0.2 0.02 270)' },
-    }, [initialsOf(name)]),
-    el('span', {}, [name || 'Unknown']),
-  ]);
 }
 
 // Epic reference with the purple epic icon (consistent with issue-type iconography).
@@ -155,7 +119,7 @@ function statusTimeline(iss) {
             el('span', { class: 'sdot' }),
             name,
           ]),
-          el('span', { class: 'task-timeline-date' }, [fmtDate(ch.date)]),
+          el('span', { class: 'task-timeline-date' }, [fmtDateSlash(ch.date)]),
         ]),
       ]);
     })
@@ -188,8 +152,8 @@ function commentList(comments) {
       el('div', { class: 'task-comment-head' }, [
         el('div', {
           class: 'avatar-mini',
-          style: { background: 'var(--violet)', color: 'oklch(0.2 0.02 270)' },
-        }, [initialsOf(c.authorName)]),
+          style: { background: 'var(--violet)' },
+        }, [initials(c.authorName)]),
         el('span', { class: 'task-comment-author' }, [c.authorName || 'Unknown']),
         el('span', { class: 'task-comment-date' }, [fmtDateTime(c.created)]),
       ]),
@@ -207,22 +171,6 @@ function loadingLine(text) {
 
 export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onBack }) {
   if (!issue) return null;
-
-  const backdrop = el('div', { class: 'epic-detail-backdrop', onClick: onClose });
-
-  const backBtn = onBack ? el('button', {
-    class: 'panel-back-btn',
-    type: 'button',
-    'aria-label': 'Go back',
-    onClick: onBack,
-  }, ['←']) : null;
-
-  const closeBtn = el('button', {
-    class: 'epic-detail-close',
-    type: 'button',
-    'aria-label': 'Close task details',
-    onClick: onClose,
-  }, ['×']);
 
   const assignee = issue.assignee || { color: 'var(--ink-3)', initials: '?', name: 'Unassigned' };
 
@@ -246,8 +194,7 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
   // ── Details card (meta + effort) ────────────────────────────────────────────
   // All meta fields are rendered immediately; reporter/dates show skeletons
   // until the lazy fetch resolves — no layout shift, just in-place substitution.
-  const assigneeCell = userCell(assignee.name, assignee.color);
-  assigneeCell.querySelector('.avatar-mini').textContent = assignee.initials;
+  const assigneeCell = renderUserCell(assignee);
 
   const reporterSlot = metaField('Reporter', fieldSkeleton());
   const createdSlot  = metaField('Created',  fieldSkeleton());
@@ -318,26 +265,21 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
     activitySection,
   ]);
 
-  const panel = el('aside', {
-    class: 'epic-detail-panel task-detail-panel',
-    role: 'dialog',
-    'aria-label': `Details for ${issue.key}`,
-  }, [backBtn, closeBtn, body]);
-
-  panel.addEventListener('click', (e) => e.stopPropagation());
-
-  const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-  document.addEventListener('keydown', onKey);
-  setTimeout(() => {
-    if (!document.body.contains(panel)) document.removeEventListener('keydown', onKey);
-  }, 50);
+  const overlay = renderPanelShell({
+    panelClass: 'epic-detail-panel task-detail-panel',
+    ariaLabel: `Details for ${issue.key}`,
+    closeLabel: 'Close task details',
+    onClose,
+    onBack,
+    body,
+  });
 
   // ── Lazy fetch ──────────────────────────────────────────────────────────────
   // API source only — demo/file return null, in which case we settle the
   // skeleton slots to dashes and show an appropriate empty state for comments.
   fetchTaskDetail(issue.key)
     .then((detail) => {
-      if (!document.body.contains(panel)) return;
+      if (!document.body.contains(overlay)) return;
 
       if (!detail) {
         reporterSlot.valueEl.replaceChildren('—');
@@ -354,11 +296,11 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
 
       // Skeleton slots → real values.
       reporterSlot.valueEl.replaceChildren(
-        detail.reporterName ? userCell(detail.reporterName, 'var(--cyan)') : '—'
+        detail.reporterName ? renderUserCell({ name: detail.reporterName, color: 'var(--cyan)' }) : '—'
       );
       createdSlot.valueEl.replaceChildren(detail.created ? fmtDateTime(detail.created) : '—');
       updatedSlot.valueEl.replaceChildren(detail.updated ? fmtDateTime(detail.updated) : '—');
-      dueSlot.valueEl.replaceChildren(detail.dueDate ? fmtDate(detail.dueDate) : '—');
+      dueSlot.valueEl.replaceChildren(detail.dueDate ? fmtDateSlash(detail.dueDate) : '—');
       labelsSlot.valueEl.replaceChildren(
         (detail.labels && detail.labels.length) ? labelChips(detail.labels) : '—'
       );
@@ -386,7 +328,7 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
       }
     })
     .catch(() => {
-      if (!document.body.contains(panel)) return;
+      if (!document.body.contains(overlay)) return;
       reporterSlot.valueEl.replaceChildren('—');
       createdSlot.valueEl.replaceChildren('—');
       updatedSlot.valueEl.replaceChildren('—');
@@ -400,5 +342,5 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
       );
     });
 
-  return el('div', { class: 'epic-detail-overlay' }, [backdrop, panel]);
+  return overlay;
 }

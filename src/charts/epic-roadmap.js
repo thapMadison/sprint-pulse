@@ -6,6 +6,8 @@
 import { el } from '../ui/dom.js';
 import { shortSprintName } from '../ui/format.js';
 import { issueTypeIcon } from '../ui/components/issue-type-icon.js';
+import { filterEpics } from '../domain/epic-filters.js';
+import { STATUS_ORDER } from '../app/constants.js';
 
 const MIN_PX_PER_DAY = 6;
 const MAX_PX_PER_DAY = 22;
@@ -45,19 +47,6 @@ function shortSprintLabel(name) {
   const trailing = (name || '').match(/(\d+)\s*$/);
   if (trailing) return `S${trailing[1]}`;
   return (name || '').slice(0, 6);
-}
-
-function applyFilters(epics, filters) {
-  const search = (filters.search || '').toLowerCase().trim();
-  return epics.filter((e) => {
-    if (filters.status !== 'all' && e.status !== filters.status) return false;
-    if (filters.sprintId !== 'all' && !e.sprintIds.includes(filters.sprintId)) return false;
-    if (search) {
-      const hay = `${e.key} ${e.name}`.toLowerCase();
-      if (!hay.includes(search)) return false;
-    }
-    return true;
-  });
 }
 
 function dateRange(epics, sprints, today) {
@@ -311,7 +300,7 @@ export function renderEpicRoadmap({
   epics, sprints, today, expandedIds, filters, jiraUrl,
   onToggleExpand, onOpenDetail, onOpenTask,
 }) {
-  const filtered = applyFilters(epics, filters);
+  const filtered = filterEpics(epics, filters);
 
   if (!filtered.length) {
     return el('div', { class: 'card roadmap-card' }, [
@@ -346,7 +335,6 @@ export function renderEpicRoadmap({
       onOpenDetail,
     }));
     if (expanded) {
-      const STATUS_ORDER = { inprogress: 0, todo: 1, done: 2 };
       const sorted = [...epic.tasks].sort((a, b) => {
         const sa = STATUS_ORDER[a.status] ?? 3;
         const sb = STATUS_ORDER[b.status] ?? 3;

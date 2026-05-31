@@ -12,3 +12,54 @@ export function statusLabel(issue) {
 export function shortSprintName(name) {
   return (name || '').split(' — ')[0] || name || '';
 }
+
+const pad2 = (n) => String(n).padStart(2, '0');
+
+// Parse a date string that may be date-only ("2025-06-05") or a full timestamp.
+// Date-only strings are pinned to local midnight so the day doesn't drift by TZ.
+function parseDate(d) {
+  if (!d) return null;
+  const dt = new Date(d.length <= 10 ? d + 'T00:00:00' : d);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+// "05/06/2025"
+export function fmtDateSlash(d) {
+  const dt = parseDate(d);
+  if (!dt) return '—';
+  return `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()}`;
+}
+
+// "05/06" — day/month without the year, for compact table cells.
+export function fmtDateShort(d) {
+  const dt = parseDate(d);
+  if (!dt) return '—';
+  return `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}`;
+}
+
+// "05/06/2025 14:30"
+export function fmtDateTime(d) {
+  const dt = parseDate(d);
+  if (!dt) return '—';
+  return `${pad2(dt.getDate())}/${pad2(dt.getMonth() + 1)}/${dt.getFullYear()} ${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
+}
+
+// Up-to-two-letter initials from a display name ("Jane Doe" → "JD").
+export function initials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+// Relative "time ago" label for the refresh FAB ("3 mins ago").
+export function timeAgo(date, now = Date.now()) {
+  if (!date) return '';
+  const mins = Math.floor((now - date.getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins === 1) return '1 min ago';
+  if (mins < 60) return `${mins} mins ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours === 1) return '1 hour ago';
+  return `${hours} hours ago`;
+}

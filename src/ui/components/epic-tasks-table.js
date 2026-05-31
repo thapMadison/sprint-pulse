@@ -1,12 +1,8 @@
 import { el } from '../dom.js';
-import { statusLabel, shortSprintName } from '../format.js';
+import { statusLabel, shortSprintName, fmtDateShort } from '../format.js';
 import { issueTypeIcon } from './issue-type-icon.js';
-
-function fmtDate(d) {
-  if (!d) return '—';
-  const dt = new Date(d + 'T00:00:00');
-  return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`;
-}
+import { renderUserCell } from './user-cell.js';
+import { STATUS_ORDER } from '../../app/constants.js';
 
 export function renderEpicTasksTable({ epic, jiraUrl, onOpenTask }) {
   if (!epic || !epic.tasks.length) {
@@ -17,7 +13,6 @@ export function renderEpicTasksTable({ epic, jiraUrl, onOpenTask }) {
   }
 
   // Sort: in-progress → todo → done; within each, by sprint then key
-  const STATUS_ORDER = { inprogress: 0, todo: 1, done: 2 };
   const tasks = [...epic.tasks].sort((a, b) => {
     const sa = STATUS_ORDER[a.status] ?? 3;
     const sb = STATUS_ORDER[b.status] ?? 3;
@@ -27,7 +22,7 @@ export function renderEpicTasksTable({ epic, jiraUrl, onOpenTask }) {
   });
 
   const rows = tasks.map((t) => {
-    const assignee = t.assignee || { color: 'var(--ink-4, oklch(0.5 0.02 270))', initials: '?', name: 'Unassigned' };
+    const assignee = t.assignee || { color: 'var(--ink-3)', initials: '?', name: 'Unassigned' };
     const keyNode = jiraUrl
       ? el('a', { href: `${jiraUrl}/browse/${t.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'mono-key jira-key-link', onClick: (e) => e.stopPropagation() }, [t.key])
       : el('span', { class: 'mono-key' }, [t.key]);
@@ -41,35 +36,22 @@ export function renderEpicTasksTable({ epic, jiraUrl, onOpenTask }) {
     el('td', {}, [el('span', { class: 'sprint-chip' }, [
       shortSprintName(t.sprintName) || '—',
     ])]),
-    el('td', {}, [
-      el('div', { class: 'user-cell-mini' }, [
-        el('div', {
-          class: 'avatar-mini',
-          style: { background: assignee.color, color: 'oklch(0.2 0.02 270)' },
-        }, [assignee.initials]),
-        el('span', {}, [assignee.name]),
-      ]),
-    ]),
+    el('td', {}, [renderUserCell(assignee)]),
     el('td', {}, [
       el('span', { class: `status-chip ${t.status}` }, [
         el('span', { class: 'sdot' }),
         statusLabel(t),
       ]),
     ]),
-    el('td', { class: 'mono-cell' }, [fmtDate(t.startedDate)]),
-    el('td', { class: 'mono-cell' }, [fmtDate(t.doneDate)]),
+    el('td', { class: 'mono-cell' }, [fmtDateShort(t.startedDate)]),
+    el('td', { class: 'mono-cell' }, [fmtDateShort(t.doneDate)]),
     ]);
   });
 
   return el('div', { class: 'card' }, [
     el('h3', { class: 'card-title' }, [
       el('span', {}, ['Tasks in this Epic']),
-      el('span', {
-        style: {
-          font: '400 11px var(--font-mono)', color: 'var(--ink-3)',
-          letterSpacing: '0.05em', textTransform: 'none',
-        },
-      }, [`${tasks.length} task${tasks.length !== 1 ? 's' : ''}`]),
+      el('span', { class: 'card-subtitle' }, [`${tasks.length} task${tasks.length !== 1 ? 's' : ''}`]),
     ]),
     el('table', { class: 'workload-table epic-tasks-table' }, [
       el('thead', {}, [

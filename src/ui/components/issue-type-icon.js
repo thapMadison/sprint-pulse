@@ -25,7 +25,6 @@ export function normalizeIssueType(raw) {
   if (n.includes('story')) return 'story';
   if (n.includes('bug') || n.includes('defect') || n.includes('incident')) return 'bug';
   if (n.includes('sub') && n.includes('task')) return 'subtask';
-  if (n === 'subtask' || n === 'sub-task') return 'subtask';
   return 'task';
 }
 

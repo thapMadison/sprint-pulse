@@ -1,6 +1,7 @@
 import { el } from '../ui/dom.js';
 import { svg } from '../charts/svg.js';
 import { generateDailySeries } from '../domain/series.js';
+import { filterEpics } from '../domain/epic-filters.js';
 
 import { renderBackground } from '../ui/components/background.js';
 import { renderTopbar } from '../ui/components/topbar.js';
@@ -444,13 +445,7 @@ function renderEpicView() {
     children.push(el('div', { class: 'banner error' }, [`Epic data: ${s.epicError}`]));
   }
 
-  const visibleEpics = s.epics.filter((e) => {
-    if (s.epicFilters.status !== 'all' && e.status !== s.epicFilters.status) return false;
-    if (s.epicFilters.sprintId !== 'all' && !e.sprintIds.includes(s.epicFilters.sprintId)) return false;
-    const q = (s.epicFilters.search || '').toLowerCase().trim();
-    if (q && !`${e.key} ${e.name}`.toLowerCase().includes(q)) return false;
-    return true;
-  }).length;
+  const visibleEpics = filterEpics(s.epics, s.epicFilters).length;
 
   children.push(renderEpicFilterBar({
     filters: s.epicFilters,

@@ -1,4 +1,5 @@
 import { DEMO_SPRINTS, DEMO_TODAY } from '../data/demo.js';
+import { VIEW, SOURCE } from './constants.js';
 
 // Epic view filters in their "show everything" default. Reused wherever the Epic
 // view is reset (new data source, refresh, logout) so the shape lives in one place.
@@ -8,7 +9,7 @@ const state = {
   sprints: DEMO_SPRINTS,
   activeSprintId: 'sp-24',
   today: DEMO_TODAY,
-  sourceKey: 'demo',
+  sourceKey: SOURCE.DEMO,
   sourceId: null, // board id (api) or file name (file) — identifies the source for caching
   sourceLabel: 'Demo · synced',
   error: null,
@@ -21,7 +22,7 @@ const state = {
   pendingBoardId: '',
   loadProgress: null,
   // Epic view state
-  view: 'sprint',
+  view: VIEW.SPRINT,
   activeEpicId: null,
   rawEpics: [],
   epics: [],

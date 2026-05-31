@@ -5,23 +5,14 @@ import {
   setApiPanelOpen, loadFromApi, setPendingBoardId, getSavedBoardId, getRecentBoards,
 } from '../../app/actions.js';
 import { renderProgressOverlay } from './progress-overlay.js';
-
-function formatLastUpdated(date) {
-  if (!date) return '';
-  const diffMins = Math.floor((Date.now() - date.getTime()) / 60000);
-  if (diffMins < 1) return 'just now';
-  if (diffMins === 1) return '1 min ago';
-  if (diffMins < 60) return `${diffMins} mins ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours === 1) return '1 hour ago';
-  return `${diffHours} hours ago`;
-}
+import { timeAgo } from '../format.js';
+import { SOURCE } from '../../app/constants.js';
 
 function statusText({ activeSource, isRefreshing, lastUpdated }) {
-  if (activeSource === 'api') {
-    return isRefreshing ? 'Refreshing...' : `Updated ${formatLastUpdated(lastUpdated)}`;
+  if (activeSource === SOURCE.API) {
+    return isRefreshing ? 'Refreshing...' : `Updated ${timeAgo(lastUpdated)}`;
   }
-  if (activeSource === 'file') return 'Loaded from file';
+  if (activeSource === SOURCE.FILE) return 'Loaded from file';
   return 'Using bundled demo';
 }
 
@@ -149,7 +140,7 @@ export function renderDataSource({
     const authed = isAuthenticated();
 
     const demoBtn = el('button', {
-      class: `ds-btn ${activeSource === 'demo' && !apiPanelOpen ? 'active' : ''}`,
+      class: `ds-btn ${activeSource === SOURCE.DEMO && !apiPanelOpen ? 'active' : ''}`,
       onClick: () => {
         setApiPanelOpen(false);
         loadDemo();
@@ -157,7 +148,7 @@ export function renderDataSource({
     }, ['Demo data']);
 
     const apiBtn = el('button', {
-      class: `ds-btn ${activeSource === 'api' || apiPanelOpen ? 'active' : ''} ${!authed ? 'disabled' : ''}`,
+      class: `ds-btn ${activeSource === SOURCE.API || apiPanelOpen ? 'active' : ''} ${!authed ? 'disabled' : ''}`,
       onClick: () => {
         if (!authed) {
           showError('Please login to connect to Jira API.');
@@ -169,7 +160,7 @@ export function renderDataSource({
     }, ['Connect with Jira']);
 
     const fileBtn = el('button', {
-      class: `ds-btn ${activeSource === 'file' && !apiPanelOpen ? 'active' : ''} ${!authed ? 'disabled' : ''}`,
+      class: `ds-btn ${activeSource === SOURCE.FILE && !apiPanelOpen ? 'active' : ''} ${!authed ? 'disabled' : ''}`,
       onClick: () => {
         if (!authed) {
           showError('Please login to import files.');
@@ -201,7 +192,7 @@ export function renderDataSource({
       trailing = inlineBoardEl;
     } else {
       const right = [el('span', { class: 'ds-status' }, [status])];
-      if (activeSource === 'api') {
+      if (activeSource === SOURCE.API) {
         right.push(el('span', { class: 'ds-divider' }));
         right.push(refresh);
       }
