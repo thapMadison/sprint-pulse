@@ -8,7 +8,7 @@ function fmtDate(d) {
   return `${String(dt.getDate()).padStart(2, '0')}/${String(dt.getMonth() + 1).padStart(2, '0')}`;
 }
 
-export function renderEpicTasksTable({ epic }) {
+export function renderEpicTasksTable({ epic, jiraUrl, onOpenTask }) {
   if (!epic || !epic.tasks.length) {
     return el('div', { class: 'card' }, [
       el('h3', { class: 'card-title' }, [el('span', {}, ['Tasks'])]),
@@ -28,10 +28,14 @@ export function renderEpicTasksTable({ epic }) {
 
   const rows = tasks.map((t) => {
     const assignee = t.assignee || { color: 'var(--ink-4, oklch(0.5 0.02 270))', initials: '?', name: 'Unassigned' };
-    return el('tr', {}, [
+    const keyNode = jiraUrl
+      ? el('a', { href: `${jiraUrl}/browse/${t.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'mono-key jira-key-link', onClick: (e) => e.stopPropagation() }, [t.key])
+      : el('span', { class: 'mono-key' }, [t.key]);
+    const trAttrs = onOpenTask ? { class: 'epic-task-clickable', onClick: () => onOpenTask(t) } : {};
+    return el('tr', trAttrs, [
     el('td', {}, [el('span', { class: 'issue-key-cell' }, [
       issueTypeIcon(t.type, { size: 16 }),
-      el('span', { class: 'mono-key' }, [t.key]),
+      keyNode,
     ])]),
     el('td', { class: 'epic-task-summary' }, [t.summary]),
     el('td', {}, [el('span', { class: 'sprint-chip' }, [

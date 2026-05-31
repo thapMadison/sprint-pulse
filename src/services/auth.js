@@ -80,3 +80,19 @@ export async function getWorkerUrl() {
   if (!snapshot.exists()) throw new Error('Worker URL not found in database');
   return snapshot.val();
 }
+
+const JIRA_URL_CACHE_KEY = 'sprint_pulse_jira_url';
+
+// Read Jira base URL from /tools/{TOOL_ID}/config/jira-url. Returns null if not configured.
+// Persists to localStorage so the value survives page reloads without a Firebase round-trip.
+export async function getJiraUrl() {
+  if (!database) await initFirebase();
+  if (!currentUser) return localStorage.getItem(JIRA_URL_CACHE_KEY);
+
+  const { ref, get } = await loadDb();
+  const snapshot = await get(ref(database, `tools/${TOOL_ID}/config/jira-url`));
+  const val = snapshot.exists() ? snapshot.val() : null;
+  if (val) localStorage.setItem(JIRA_URL_CACHE_KEY, val);
+  else localStorage.removeItem(JIRA_URL_CACHE_KEY);
+  return val;
+}

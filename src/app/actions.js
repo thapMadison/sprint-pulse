@@ -6,7 +6,7 @@ import { buildSprintsFromIssues, buildSprintShells, populateSprintIssues } from 
 import { buildLightweightEpics, enrichEpicWithDetail } from '../domain/epic-builder.js';
 import { parseFile } from '../data/parsers/index.js';
 import {
-  signInWithMicrosoft, signOut, isAuthenticated, getWorkerUrl,
+  signInWithMicrosoft, signOut, isAuthenticated, getWorkerUrl, getJiraUrl,
 } from '../services/auth.js';
 import * as cache from '../services/data-cache.js';
 import {
@@ -375,6 +375,17 @@ function reloadEpicsIfActive() {
   }
 }
 
+// Trigger epic detail loading if any non-isNoEpic epic hasn't been enriched yet.
+// Called when an epic panel is opened outside the epic view (nav stack).
+export function ensureEpicsLoaded() {
+  const s = getState();
+  if (!s.epicLoadProgress && s.epics.some((e) => !e.isNoEpic && !e.detailLoaded)) {
+    loadEpicsAndChangelogs().catch((e) => {
+      setEpicViewState({ epicError: e.message || String(e) });
+    });
+  }
+}
+
 export function setPendingBoardId(v) {
   // No re-render — would steal focus from the input the user is typing into.
   setStateSilent({ pendingBoardId: v });
@@ -516,6 +527,7 @@ export async function loadFromApi(boardId) {
       localStorage.setItem(BOARD_ID_KEY, boardId);
       restoreSnapshot(snap, { apiPanelOpen: false });
       cache.setLastSource(sourceDescriptor());
+      getJiraUrl().then((url) => setStateSilent({ jiraUrl: url })).catch(() => {});
       return true;
     }
   }
@@ -524,6 +536,7 @@ export async function loadFromApi(boardId) {
     setProgress('connect', 'api');
     const workerUrl = await getWorkerUrl();
     if (!workerUrl) throw new Error('Worker URL not configured in Firebase database.');
+    const jiraUrl = await getJiraUrl().catch(() => null);
 
     localStorage.setItem(BOARD_ID_KEY, boardId);
     setProgress('fetch');
@@ -539,7 +552,7 @@ export async function loadFromApi(boardId) {
 
     setProgress('process');
     const sprints = buildSprintShells(rawSprints, getState().today);
-    applyLoadedSprints(sprints, apiSourceLabel(board, boardId), 'api', { apiPanelOpen: false, sourceId: boardId });
+    applyLoadedSprints(sprints, apiSourceLabel(board, boardId), 'api', { apiPanelOpen: false, sourceId: boardId, jiraUrl });
     // Step 2: load only the default (active) sprint's issues for the first paint.
     await loadSprintDetail(getState().activeSprintId);
     persistCurrent();
@@ -570,6 +583,7 @@ export async function refreshFromApi() {
     setProgress('connect', 'api');
     const workerUrl = await getWorkerUrl();
     if (!workerUrl) throw new Error('Worker URL not configured in Firebase.');
+    const jiraUrl = await getJiraUrl().catch(() => null);
     setProgress('fetch');
     const [board, rawSprints] = await Promise.all([
       fetchBoardFromWorker(workerUrl, boardId).catch(() => null),
@@ -582,7 +596,7 @@ export async function refreshFromApi() {
     setProgress('process');
     const prevActive = getState().activeSprintId;
     const sprints = buildSprintShells(rawSprints, getState().today);
-    applyLoadedSprints(sprints, apiSourceLabel(board, boardId), 'api', { sourceId: boardId });
+    applyLoadedSprints(sprints, apiSourceLabel(board, boardId), 'api', { sourceId: boardId, jiraUrl });
     // Keep the user on the sprint they were viewing if it still exists.
     if (sprints.some((sp) => sp.id === prevActive)) {
       setStateSilent({ activeSprintId: prevActive });

@@ -69,14 +69,29 @@ function userCell(name, color) {
 }
 
 // Epic reference with the purple epic icon (consistent with issue-type iconography).
-function epicBadge(issue) {
+// If onOpenEpic is provided, clicking opens the epic detail panel in-app.
+// Falls back to a Jira external link if only jiraUrl is provided.
+function epicBadge(issue, jiraUrl, onOpenEpic) {
   const text = issue.epicName
     ? `${issue.epicKey || ''} ${issue.epicName}`.trim()
     : (issue.epicKey || '—');
-  return el('span', { class: 'issue-type-badge epic-ref-badge' }, [
+  const badgeChildren = [
     issueTypeIcon('epic', { withTitle: false, size: 16 }),
     el('span', {}, [text]),
-  ]);
+  ];
+  if (onOpenEpic && issue.epicKey) {
+    return el('button', {
+      type: 'button',
+      class: 'issue-type-badge epic-ref-badge epic-badge-btn',
+      onClick: () => onOpenEpic(issue.epicKey),
+    }, badgeChildren);
+  }
+  if (jiraUrl && issue.epicKey) {
+    return el('a', { href: `${jiraUrl}/browse/${issue.epicKey}`, target: '_blank', rel: 'noopener noreferrer', class: 'jira-key-link' }, [
+      el('span', { class: 'issue-type-badge epic-ref-badge' }, badgeChildren),
+    ]);
+  }
+  return el('span', { class: 'issue-type-badge epic-ref-badge' }, badgeChildren);
 }
 
 // Effort stats in stat-tile card style (matching the sprint hero's stat-grid).
@@ -190,10 +205,17 @@ function loadingLine(text) {
   ]);
 }
 
-export function renderTaskDetailPanel({ issue, onClose }) {
+export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onBack }) {
   if (!issue) return null;
 
   const backdrop = el('div', { class: 'epic-detail-backdrop', onClick: onClose });
+
+  const backBtn = onBack ? el('button', {
+    class: 'panel-back-btn',
+    type: 'button',
+    'aria-label': 'Go back',
+    onClick: onBack,
+  }, ['←']) : null;
 
   const closeBtn = el('button', {
     class: 'epic-detail-close',
@@ -209,7 +231,9 @@ export function renderTaskDetailPanel({ issue, onClose }) {
     el('div', { class: 'task-detail-head-row' }, [
       el('span', { class: 'issue-key-cell' }, [
         issueTypeIcon(issue.type, { size: 18 }),
-        el('span', { class: 'task-detail-key' }, [issue.key]),
+        jiraUrl
+          ? el('a', { href: `${jiraUrl}/browse/${issue.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'task-detail-key jira-key-link' }, [issue.key])
+          : el('span', { class: 'task-detail-key' }, [issue.key]),
       ]),
       el('span', { class: `status-chip ${issue.status}` }, [
         el('span', { class: 'sdot' }),
@@ -235,7 +259,7 @@ export function renderTaskDetailPanel({ issue, onClose }) {
   // Row 1: Type | Priority | Epic(span2, always shown)
   // Row 2: Assignee(newRow) | Reporter | Created | Updated
   // Row 3: Due | Labels(span3)
-  const epicValue = (issue.epicKey || issue.epicName) ? epicBadge(issue) : '—';
+  const epicValue = (issue.epicKey || issue.epicName) ? epicBadge(issue, jiraUrl, onOpenEpic) : '—';
   const metaFields = [
     metaField('Type',     issueTypeBadge(issue.type)),
     metaField('Priority', el('span', { class: `task-priority ${(issue.priority || '').toLowerCase()}` }, [issue.priority || '—'])),
@@ -298,7 +322,7 @@ export function renderTaskDetailPanel({ issue, onClose }) {
     class: 'epic-detail-panel task-detail-panel',
     role: 'dialog',
     'aria-label': `Details for ${issue.key}`,
-  }, [closeBtn, body]);
+  }, [backBtn, closeBtn, body]);
 
   panel.addEventListener('click', (e) => e.stopPropagation());
 

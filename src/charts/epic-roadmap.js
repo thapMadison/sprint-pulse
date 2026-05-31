@@ -119,25 +119,26 @@ function chevron(open) {
 // Epic bar: a muted track in the status color, with a solid fill showing the
 // done-percentage of tasks inside. Ongoing epics get a dashed right edge.
 // Shows a shimmer effect when detail is still loading.
-function epicBar(epic, dayToPct, today) {
+function epicBar(epic, dayToPct, today, onClick) {
   const isLoading = !epic.detailLoaded;
+  const clickProps = onClick ? { onClick, style: { cursor: 'pointer' } } : {};
   if (!epic.startDate) {
     const emptyContent = isLoading ? 'Loading...' : 'Not started';
-    return el('div', { class: `roadmap-bar-empty ${isLoading ? 'loading' : ''}` }, [emptyContent]);
+    return el('div', { class: `roadmap-bar-empty ${isLoading ? 'loading' : ''}`, ...clickProps }, [emptyContent]);
   }
   const ongoing = !epic.endDate;
   const endStr = epic.endDate || today;
   const left = dayToPct(epic.startDate);
   const right = dayToPct(endStr);
-  // True duration as a % of the timeline; CSS min-width keeps short bars visible.
   const width = Math.max(0, right - left);
   const pct = epic.progress.percent || 0;
   const cls = `roadmap-bar epic ${epic.status} ${ongoing ? 'ongoing' : ''} ${isLoading ? 'loading' : ''}`;
   const titleSuffix = isLoading ? '\n(Loading detail...)' : '';
   return el('div', {
     class: cls,
-    style: { left: `${left}%`, width: `${width}%` },
+    style: { left: `${left}%`, width: `${width}%`, ...(onClick ? { cursor: 'pointer' } : {}) },
     title: `${epic.key} · ${epic.name}\n${epic.startDate} → ${epic.endDate || 'ongoing'}\nProgress: ${pct}%${titleSuffix}`,
+    ...(onClick ? { onClick } : {}),
   }, [
     el('div', { class: 'roadmap-bar-fill', style: { width: `${pct}%` } }),
     el('span', { class: 'roadmap-bar-pct' }, [`${pct}%`]),
@@ -250,24 +251,28 @@ function todayMarker(today, dayToPct) {
   }, [el('span', { class: 'roadmap-today-label' }, ['Today'])]);
 }
 
-function epicRow({ epic, expanded, dayToPct, today, onToggle, onOpenDetail }) {
+function epicRow({ epic, expanded, dayToPct, today, jiraUrl, onToggle, onOpenDetail }) {
+  const keyNode = (jiraUrl && !epic.isNoEpic)
+    ? el('a', { href: `${jiraUrl}/browse/${epic.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'roadmap-key jira-key-link', onClick: (e) => e.stopPropagation() }, [epic.key])
+    : el('span', { class: 'roadmap-key' }, [epic.isNoEpic ? 'NO EPIC' : epic.key]);
+
   const left = el('div', { class: 'roadmap-row-left epic-left' }, [
     el('button', {
       class: `roadmap-chevron-btn ${expanded ? 'open' : ''}`,
       type: 'button',
       'aria-label': expanded ? 'Collapse' : 'Expand',
-      onClick: () => onToggle(epic.id),
+      onClick: (e) => { e.stopPropagation(); onToggle(epic.id); },
     }, [chevron(expanded)]),
-    el('div', { class: 'roadmap-meta' }, [
+    el('div', { class: 'roadmap-meta roadmap-meta-clickable', onClick: () => onOpenDetail(epic.id) }, [
       el('div', { class: 'roadmap-meta-top' }, [
         epic.isNoEpic ? null : issueTypeIcon('epic', { size: 14, withTitle: false }),
-        el('span', { class: 'roadmap-key' }, [epic.isNoEpic ? 'NO EPIC' : epic.key]),
+        keyNode,
         statusPill(epic),
       ]),
       el('button', {
         class: 'roadmap-name-btn',
         type: 'button',
-        onClick: () => onOpenDetail(epic.id),
+        onClick: (e) => { e.stopPropagation(); onOpenDetail(epic.id); },
         title: 'Open details',
       }, [epic.name]),
       progressMini(epic),
@@ -275,30 +280,36 @@ function epicRow({ epic, expanded, dayToPct, today, onToggle, onOpenDetail }) {
   ]);
 
   const right = el('div', { class: 'roadmap-row-right' }, [
-    epicBar(epic, dayToPct, today),
+    epicBar(epic, dayToPct, today, () => onOpenDetail(epic.id)),
   ]);
 
   return el('div', { class: 'roadmap-row epic-row' }, [left, right]);
 }
 
-function taskRow({ task, dayToPct, today, sprints }) {
-  const left = el('div', { class: 'roadmap-row-left task-left' }, [
+function taskRow({ task, dayToPct, today, sprints, jiraUrl, onOpenTask }) {
+  const keyNode = jiraUrl
+    ? el('a', { href: `${jiraUrl}/browse/${task.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'roadmap-task-key jira-key-link', onClick: (e) => e.stopPropagation() }, [task.key])
+    : el('span', { class: 'roadmap-task-key' }, [task.key]);
+
+  const leftClass = `roadmap-row-left task-left${onOpenTask ? ' roadmap-task-clickable' : ''}`;
+  const left = el('div', { class: leftClass, ...(onOpenTask ? { onClick: () => onOpenTask(task) } : {}) }, [
     el('span', { class: 'roadmap-task-indent' }),
     issueTypeIcon(task.type, { size: 15 }),
-    el('span', { class: 'roadmap-task-key' }, [task.key]),
+    keyNode,
     el('span', { class: 'roadmap-task-summary' }, [task.summary || '']),
     el('span', { class: `roadmap-task-status ${task.status}` }, [
       task.statusName || task.status,
     ]),
   ]);
   const bar = taskBar(task, dayToPct, today, sprints);
-  const right = el('div', { class: 'roadmap-row-right task' }, bar ? [bar] : []);
+  const rightClass = `roadmap-row-right task${onOpenTask ? ' roadmap-task-clickable' : ''}`;
+  const right = el('div', { class: rightClass, ...(onOpenTask ? { onClick: () => onOpenTask(task) } : {}) }, bar ? [bar] : []);
   return el('div', { class: 'roadmap-row task-row' }, [left, right]);
 }
 
 export function renderEpicRoadmap({
-  epics, sprints, today, expandedIds, filters,
-  onToggleExpand, onOpenDetail,
+  epics, sprints, today, expandedIds, filters, jiraUrl,
+  onToggleExpand, onOpenDetail, onOpenTask,
 }) {
   const filtered = applyFilters(epics, filters);
 
@@ -330,7 +341,7 @@ export function renderEpicRoadmap({
   for (const epic of filtered) {
     const expanded = expandedIds.has(epic.id);
     rows.push(epicRow({
-      epic, expanded, dayToPct, today,
+      epic, expanded, dayToPct, today, jiraUrl,
       onToggle: onToggleExpand,
       onOpenDetail,
     }));
@@ -343,7 +354,7 @@ export function renderEpicRoadmap({
         return (a.startedDate || '9999').localeCompare(b.startedDate || '9999');
       });
       for (const t of sorted) {
-        rows.push(taskRow({ task: t, dayToPct, today, sprints }));
+        rows.push(taskRow({ task: t, dayToPct, today, sprints, jiraUrl, onOpenTask }));
       }
     }
   }

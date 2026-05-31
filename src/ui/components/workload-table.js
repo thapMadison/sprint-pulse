@@ -1,14 +1,16 @@
 import { el } from '../dom.js';
 import { svg } from '../../charts/svg.js';
 import { statusLabel } from '../format.js';
-import { renderTaskDetailPanel } from './task-detail-panel.js';
 import { issueTypeIcon } from './issue-type-icon.js';
 
-function renderIssueRow(iss, onOpen) {
+function renderIssueRow(iss, onOpen, jiraUrl) {
+  const keyNode = jiraUrl
+    ? el('a', { href: `${jiraUrl}/browse/${iss.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'jira-key-link', onClick: (e) => e.stopPropagation() }, [iss.key])
+    : el('span', {}, [iss.key]);
   return el('div', { class: 'issue-row issue-row-clickable', onClick: () => onOpen(iss) }, [
     el('span', { class: 'key issue-key-cell' }, [
       issueTypeIcon(iss.type, { size: 16 }),
-      el('span', {}, [iss.key]),
+      keyNode,
     ]),
     el('span', { class: 'summary' }, [iss.summary]),
     el('span', {}, [
@@ -105,23 +107,15 @@ function searchIcon() {
   ]);
 }
 
-export function renderWorkloadTable({ sprint }) {
+export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
   const allRows = groupByUser(sprint.issues);
   let expandedUserId = null;
   let query = '';
 
   const tbody = el('tbody', {}, []);
 
-  // The detail panel mounts into <body>; we keep a handle so we can swap/remove it.
-  let openPanel = null;
-  function closeDetail() {
-    if (openPanel && openPanel.parentNode) openPanel.parentNode.removeChild(openPanel);
-    openPanel = null;
-  }
   function openDetail(issue) {
-    closeDetail();
-    openPanel = renderTaskDetailPanel({ issue, onClose: closeDetail });
-    if (openPanel) document.body.appendChild(openPanel);
+    if (onOpenTask) onOpenTask(issue);
   }
 
   function renderBody() {
@@ -194,7 +188,7 @@ export function renderWorkloadTable({ sprint }) {
           el('td', { colSpan: 6 }, [
             el('div', { class: 'issue-list' }, [
               renderIssueListHeader(),
-              ...matchingIssues.map((iss) => renderIssueRow(iss, openDetail)),
+              ...matchingIssues.map((iss) => renderIssueRow(iss, openDetail, jiraUrl)),
             ]),
           ]),
         ]));

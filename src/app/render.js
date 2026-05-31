@@ -8,6 +8,7 @@ import { renderDataSource } from '../ui/components/data-source-bar.js';
 import { renderSprintFilter, updateSprintFilterActive } from '../ui/components/sprint-filter.js';
 import { renderSprintHero } from '../ui/components/sprint-hero.js';
 import { renderWorkloadTable } from '../ui/components/workload-table.js';
+import { renderTaskDetailPanel } from '../ui/components/task-detail-panel.js';
 import { renderViewTabs } from '../ui/components/view-tabs.js';
 import { renderEpicFilterBar } from '../ui/components/epic-filter-bar.js';
 import { renderEpicDetailPanel } from '../ui/components/epic-detail-panel.js';
@@ -22,12 +23,85 @@ import { renderControl } from '../charts/control.js';
 import { renderDonut } from '../charts/donut.js';
 import { renderEpicRoadmap } from '../charts/epic-roadmap.js';
 
-import { getState, activeSprint, DEFAULT_EPIC_FILTERS } from './state.js';
+import { getState, activeSprint, DEFAULT_EPIC_FILTERS, subscribeEpicRoadmap } from './state.js';
 import {
   login, logout, setActiveSprint, setView,
   toggleEpicExpanded, openEpicDetail, closeEpicDetail,
-  setEpicFilter, setEpicSearchSilent,
+  setEpicFilter, setEpicSearchSilent, ensureEpicsLoaded,
 } from './actions.js';
+
+// ─── Body-panel navigation stack ──────────────────────────────────────────
+// Task/epic detail panels are mounted directly on <body> (outside the render
+// tree) and share a history stack so the user can navigate back.
+// Each entry: { type: 'task', data: issue } | { type: 'epic', data: epicKey }
+let _navStack = [];
+let _bodyPanelEl = null;
+
+function navClose() {
+  if (_bodyPanelEl && _bodyPanelEl.parentNode) _bodyPanelEl.parentNode.removeChild(_bodyPanelEl);
+  _bodyPanelEl = null;
+  _navStack = [];
+}
+
+function navPop() {
+  _navStack.pop();
+  if (_navStack.length) renderNavTop(); else navClose();
+}
+
+function navPush(entry) {
+  _navStack.push(entry);
+  renderNavTop();
+}
+
+function renderNavTop() {
+  if (_bodyPanelEl && _bodyPanelEl.parentNode) _bodyPanelEl.parentNode.removeChild(_bodyPanelEl);
+  _bodyPanelEl = null;
+  const top = _navStack[_navStack.length - 1];
+  if (!top) return;
+  const onBack = _navStack.length > 1 ? navPop : (top.backAction || null);
+  const s = getState();
+  if (top.type === 'task') {
+    _bodyPanelEl = renderTaskDetailPanel({
+      issue: top.data,
+      jiraUrl: s.jiraUrl,
+      onClose: navClose,
+      onBack,
+      onOpenEpic: s.epics.length ? (epicKey) => navPush({ type: 'epic', data: epicKey }) : null,
+    });
+  } else {
+    const epic = s.epics.find((e) => e.key === top.data);
+    if (!epic) { navPop(); return; }
+    _bodyPanelEl = renderEpicDetailPanel({
+      epic,
+      today: s.today,
+      jiraUrl: s.jiraUrl,
+      onClose: navClose,
+      onBack,
+      onOpenTask: (task) => navPush({ type: 'task', data: task }),
+    });
+    if (_bodyPanelEl) {
+      document.body.appendChild(_bodyPanelEl);
+      // Trigger detail loading if needed, then re-render once detail arrives.
+      if (!epic.detailLoaded) {
+        ensureEpicsLoaded();
+        const epicKey = top.data;
+        const panelEl = _bodyPanelEl;
+        const unsub = subscribeEpicRoadmap((updated) => {
+          const e = updated.epics.find((x) => x.key === epicKey);
+          if (!document.body.contains(panelEl)) { unsub(); return; }
+          if (e?.detailLoaded) { unsub(); renderNavTop(); }
+        });
+      }
+    }
+    return; // already appended above
+  }
+  if (_bodyPanelEl) document.body.appendChild(_bodyPanelEl);
+}
+
+function openTaskPanel(issue, backAction) {
+  _navStack = [{ type: 'task', data: issue, backAction: backAction || null }];
+  renderNavTop();
+}
 
 const CHART_TOOLTIPS = {
   burndown: {
@@ -278,7 +352,7 @@ function buildSprintContent(s) {
       chartCard('Burnup', renderBurnup(series), 'burnup'),
       chartCard('Control Chart', renderControl(series), 'control'),
     ]));
-    out.push(el('div', { class: 'row' }, [renderWorkloadTable({ sprint })]));
+    out.push(el('div', { class: 'row' }, [renderWorkloadTable({ sprint, jiraUrl: s.jiraUrl, onOpenTask: openTaskPanel })]));
   }
   return out;
 }
@@ -334,8 +408,10 @@ function buildRoadmap(s) {
     today: s.today,
     expandedIds: s.expandedEpicIds,
     filters: s.epicFilters,
+    jiraUrl: s.jiraUrl,
     onToggleExpand: toggleEpicExpanded,
     onOpenDetail: openEpicDetail,
+    onOpenTask: openTaskPanel,
   });
 }
 
@@ -394,7 +470,12 @@ function renderEpicView() {
     : null;
   if (detailEpic) {
     children.push(renderEpicDetailPanel({
-      epic: detailEpic, today: s.today, onClose: closeEpicDetail,
+      epic: detailEpic, today: s.today, onClose: closeEpicDetail, jiraUrl: s.jiraUrl,
+      onOpenTask: (task) => {
+        const epicId = detailEpic.id;
+        closeEpicDetail();
+        openTaskPanel(task, () => { navClose(); openEpicDetail(epicId); });
+      },
     }));
   }
 

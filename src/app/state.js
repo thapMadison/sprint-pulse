@@ -17,6 +17,7 @@ const state = {
   user: null,
   showLoginPrompt: false,
   apiPanelOpen: false,
+  jiraUrl: (typeof localStorage !== 'undefined' ? localStorage.getItem('sprint_pulse_jira_url') : null) || null,
   pendingBoardId: '',
   loadProgress: null,
   // Epic view state

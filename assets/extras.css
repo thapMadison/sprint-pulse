@@ -1588,6 +1588,12 @@ html.theme-light {
 }
 
 /* --- Epic tasks table additions --- */
+.epic-task-clickable {
+  cursor: pointer;
+}
+.epic-task-clickable:hover td {
+  background: color-mix(in oklch, var(--ink) 4%, transparent);
+}
 .epic-tasks-table .epic-task-summary {
   color: var(--ink-2);
   font-weight: 400;
@@ -2035,6 +2041,13 @@ html.theme-light {
   color: oklch(0.78 0.16 295);
   text-decoration: underline;
 }
+/* Clickable meta area and right bar on epic rows. */
+.roadmap-meta-clickable { cursor: pointer; }
+.roadmap-right-clickable { cursor: pointer; }
+.roadmap-task-clickable { cursor: pointer; }
+.roadmap-task-clickable:hover {
+  background: color-mix(in oklch, var(--ink) 5%, transparent);
+}
 .roadmap-status-pill {
   font-family: var(--font-mono);
   font-size: 9px;
@@ -2458,6 +2471,28 @@ html.theme-light {
   color: var(--ink);
 }
 .theme-light .epic-detail-close { background: oklch(0.2 0.01 270 / 0.04); }
+/* Back button — mirrors close button but floats left */
+.panel-back-btn {
+  position: sticky;
+  top: 8px;
+  float: left;
+  margin: 8px 0 0 12px;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: oklch(1 0 0 / 0.04);
+  color: var(--ink-2);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 5;
+}
+.panel-back-btn:hover {
+  background: oklch(1 0 0 / 0.12);
+  color: var(--ink);
+}
+.theme-light .panel-back-btn { background: oklch(0.2 0.01 270 / 0.04); }
 .epic-detail-body {
   padding: 28px 24px 32px;
   display: flex;
@@ -2742,6 +2777,16 @@ html.theme-light {
   gap: 8px;
 }
 
+/* Jira issue/epic key that links out to Jira in a new tab */
+.jira-key-link {
+  color: inherit;
+  text-decoration: none;
+}
+.jira-key-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* ============================================================
    Task detail — lazily-loaded extras (description, comments, labels)
    ============================================================ */
@@ -2862,3 +2907,14 @@ html.theme-light {
   font-size: 13px;
   color: var(--ink);
 }
+/* Epic badge rendered as a button (opens Epic detail panel in-app). */
+.epic-badge-btn {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.epic-badge-btn:hover { opacity: 0.8; }

@@ -44,7 +44,7 @@ function statTile({ label, value, sub, accentBg, fillPct }) {
   ]);
 }
 
-export function renderEpicHero({ epic, today }) {
+export function renderEpicHero({ epic, today, jiraUrl }) {
   const isOngoing = epic.status === 'inprogress';
   const isLoading = !epic.detailLoaded;
   const durationLabel = epic.endDate
@@ -71,7 +71,9 @@ export function renderEpicHero({ epic, today }) {
         el('div', { class: 'name' }, [
           el('span', { class: 'issue-key-cell' }, [
             epic.isNoEpic ? null : issueTypeIcon('epic', { size: 18, withTitle: false }),
-            el('span', { class: 'epic-hero-key' }, [epic.isNoEpic ? 'NO EPIC' : epic.key]),
+            (jiraUrl && !epic.isNoEpic)
+              ? el('a', { href: `${jiraUrl}/browse/${epic.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'epic-hero-key jira-key-link' }, [epic.key])
+              : el('span', { class: 'epic-hero-key' }, [epic.isNoEpic ? 'NO EPIC' : epic.key]),
           ]),
           el('span', { class: 'epic-hero-name' }, [epic.name]),
         ]),
