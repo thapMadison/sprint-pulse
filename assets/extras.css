@@ -668,9 +668,15 @@ html.theme-light {
   background: oklch(1 0 0 / 0.12);
   border-color: var(--border-strong);
 }
-.lang-globe {
-  font-size: 13px;
-  line-height: 1;
+.lang-flag {
+  flex: none;
+  width: 20px;
+  height: 15px;
+  /* Twemoji flag image — fixed box, gently rounded so it reads as a flag chip */
+  object-fit: cover;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px oklch(1 0 0 / 0.12);
+  display: block;
 }
 .lang-menu.open .user-chevron {
   transform: rotate(180deg);
@@ -698,18 +704,36 @@ html.theme-light {
   transform: translateY(0);
 }
 .lang-option {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
-  padding: 10px 10px;
+  padding: 9px 10px;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   border-radius: 8px;
   color: var(--ink-2);
   font-family: var(--font-body);
   font-size: 13px;
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.lang-option + .lang-option {
+  margin-top: 2px;
+}
+.lang-option-label {
+  flex: 1 1 auto;
+}
+/* Tick mark for the active language — hidden by default, revealed on .active */
+.lang-check {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cyan);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.15s ease, transform 0.15s ease;
 }
 .lang-option:hover {
   background: oklch(1 0 0 / 0.08);
@@ -717,8 +741,18 @@ html.theme-light {
 }
 .lang-option.active {
   color: var(--ink);
-  background: oklch(1 0 0 / 0.06);
   font-weight: 600;
+  /* Accent-tinted fill + ring so the current language reads at a glance */
+  background: linear-gradient(
+    135deg,
+    oklch(0.72 0.18 295 / 0.22),
+    oklch(0.82 0.13 200 / 0.18)
+  );
+  border-color: oklch(0.82 0.13 200 / 0.45);
+}
+.lang-option.active .lang-check {
+  opacity: 1;
+  transform: scale(1);
 }
 .theme-light .lang-dropdown {
   background: rgba(255, 255, 255, 0.95);

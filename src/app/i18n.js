@@ -19,11 +19,17 @@ const TABLES = { en, vi };
 // The default + ultimate fallback. Its table is assumed to define every key.
 export const DEFAULT_LANG = 'en';
 
+// Twemoji (Twitter emoji) flag SVGs — used instead of raw emoji because Windows
+// does not render regional-indicator flag glyphs (they fall back to letter pairs).
+// Codepoints are the two regional-indicator letters of the country code.
+const TWEMOJI_BASE = 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg';
+
 // Shown in the language picker, in display order. `label` is the autonym (the name
 // of the language in that language) so it reads correctly regardless of active UI.
+// `flag` is a Twemoji flag-image URL used as a quick visual cue in the picker.
 export const SUPPORTED_LANGS = [
-  { code: 'en', label: 'English' },
-  { code: 'vi', label: 'Tiếng Việt' },
+  { code: 'en', label: 'English', flag: `${TWEMOJI_BASE}/1f1ec-1f1e7.svg` },
+  { code: 'vi', label: 'Tiếng Việt', flag: `${TWEMOJI_BASE}/1f1fb-1f1f3.svg` },
 ];
 
 export const LANG_STORAGE_KEY = 'sprint_pulse_lang';

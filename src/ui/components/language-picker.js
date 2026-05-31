@@ -7,12 +7,17 @@ import { SUPPORTED_LANGS, t } from '../../app/i18n.js';
 export function renderLanguagePicker({ active, onChange }) {
   const current = SUPPORTED_LANGS.find((l) => l.code === active) || SUPPORTED_LANGS[0];
 
+  // A Twemoji flag image. `alt` is empty since the adjacent label already names
+  // the language (the flag is purely decorative for assistive tech).
+  const flagImg = (l) =>
+    el('img', { class: 'lang-flag', src: l.flag, alt: '', loading: 'lazy', width: '20', height: '15' });
+
   const trigger = el('button', {
     class: 'pill lang-pill',
     type: 'button',
     'aria-label': t('lang.label'),
   }, [
-    el('span', { class: 'lang-globe' }, ['🌐']),
+    flagImg(current),
     el('span', { class: 'lang-current' }, [current.label]),
     el('span', { class: 'user-chevron' }, ['▾']),
   ]);
@@ -24,7 +29,11 @@ export function renderLanguagePicker({ active, onChange }) {
         type: 'button',
         'data-code': l.code,
         onClick: () => onChange(l.code),
-      }, [l.label])
+      }, [
+        flagImg(l),
+        el('span', { class: 'lang-option-label' }, [l.label]),
+        el('span', { class: 'lang-check' }, ['✓']),
+      ])
     )
   );
 
