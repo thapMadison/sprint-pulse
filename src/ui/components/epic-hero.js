@@ -1,6 +1,7 @@
 import { el } from '../dom.js';
 import { fmtDate, fmtDow, metaItem, dayUnit } from '../hero-helpers.js';
 import { issueTypeIcon } from './issue-type-icon.js';
+import { t } from '../../app/i18n.js';
 
 function daysBetween(a, b) {
   if (!a || !b) return 0;
@@ -11,12 +12,12 @@ function daysBetween(a, b) {
 
 function statusBadge(epic) {
   if (epic.isNoEpic) {
-    return el('span', { class: 'epic-hero-badge' }, ['Loose tasks']);
+    return el('span', { class: 'epic-hero-badge' }, [t('epicHero.looseTasks')]);
   }
   const label =
-    epic.status === 'done' ? 'Done' :
-    epic.status === 'inprogress' ? 'In Progress' :
-    'Not Started';
+    epic.status === 'done' ? t('epicHero.statusDone') :
+    epic.status === 'inprogress' ? t('epicHero.statusInProgress') :
+    t('epicHero.statusNotStarted');
   return el('span', { class: `epic-hero-badge ${epic.status}` }, [
     el('span', { class: 'pulse' }),
     label,
@@ -53,17 +54,17 @@ export function renderEpicHero({ epic, today, jiraUrl }) {
       ? `${daysBetween(epic.startDate, today)}`
       : '0';
   const durationSub = epic.endDate
-    ? 'days'
+    ? t('epicHero.days')
     : epic.startDate
-      ? 'days · ongoing'
-      : 'not started';
+      ? t('epicHero.daysOngoing')
+      : t('epicHero.notStarted');
 
   const endValue = epic.endDate
     ? [fmtDate(epic.endDate)]
     : epic.status === 'todo'
-      ? ['Not started']
-      : ['In progress'];
-  const endSub = epic.endDate ? fmtDow(epic.endDate) : 'no end yet';
+      ? [t('epicHero.endNotStarted')]
+      : [t('epicHero.endInProgress')];
+  const endSub = epic.endDate ? fmtDow(epic.endDate) : t('epicHero.noEndYet');
 
   return el('div', { class: `sprint-hero epic-hero ${isLoading ? 'loading' : ''}` }, [
     el('div', { class: 'card sprint-card epic-hero-card' }, [
@@ -73,12 +74,12 @@ export function renderEpicHero({ epic, today, jiraUrl }) {
             epic.isNoEpic ? null : issueTypeIcon('epic', { size: 18, withTitle: false }),
             (jiraUrl && !epic.isNoEpic)
               ? el('a', { href: `${jiraUrl}/browse/${epic.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'epic-hero-key jira-key-link' }, [epic.key])
-              : el('span', { class: 'epic-hero-key' }, [epic.isNoEpic ? 'NO EPIC' : epic.key]),
+              : el('span', { class: 'epic-hero-key' }, [epic.isNoEpic ? t('epicHero.noEpic') : epic.key]),
           ]),
           el('span', { class: 'epic-hero-name' }, [epic.name]),
         ]),
         el('div', { class: 'epic-hero-badges' }, [
-          isLoading ? el('span', { class: 'epic-hero-badge loading' }, ['Loading...']) : null,
+          isLoading ? el('span', { class: 'epic-hero-badge loading' }, [t('epicHero.loading')]) : null,
           statusBadge(epic),
         ].filter(Boolean)),
       ]),
@@ -86,32 +87,32 @@ export function renderEpicHero({ epic, today, jiraUrl }) {
         ? el('p', { class: 'epic-hero-summary' }, [epic.summary])
         : null,
       el('div', { class: 'sprint-meta' }, [
-        metaItem('Start', [fmtDate(epic.startDate)], epic.startDate ? fmtDow(epic.startDate) : 'not started'),
-        metaItem('End', endValue, endSub, isOngoing ? { color: 'var(--amber)' } : null),
-        metaItem('Duration', [durationLabel, dayUnit()], durationSub),
-        metaItem('Sprints', [String(epic.sprintIds.length)], `spans ${epic.sprintIds.length} sprint${epic.sprintIds.length !== 1 ? 's' : ''}`),
+        metaItem(t('hero.start'), [fmtDate(epic.startDate)], epic.startDate ? fmtDow(epic.startDate) : t('epicHero.notStarted')),
+        metaItem(t('hero.end'), endValue, endSub, isOngoing ? { color: 'var(--amber)' } : null),
+        metaItem(t('hero.duration'), [durationLabel, dayUnit()], durationSub),
+        metaItem(t('hero.sprints'), [String(epic.sprintIds.length)], t('epicHero.spans', { count: epic.sprintIds.length })),
       ]),
     ]),
     el('div', { class: 'stat-grid' }, [
       statTile({
-        label: 'Progress',
+        label: t('hero.progress'),
         value: [`${epic.progress.percent}`, el('span', { class: 'unit' }, ['%'])],
-        sub: `${epic.progress.doneIssues}/${epic.progress.totalIssues} issues`,
+        sub: t('epicHero.issues', { done: epic.progress.doneIssues, total: epic.progress.totalIssues }),
         accentBg: 'linear-gradient(90deg, var(--lime), var(--cyan))',
         fillPct: epic.progress.percent,
       }),
       statTile({
-        label: 'Total Effort',
+        label: t('hero.totalEffort'),
         value: [`${epic.progress.totalHours.toFixed(0)}`, el('span', { class: 'unit' }, ['h'])],
-        sub: `${epic.progress.hours.done.toFixed(0)}h done`,
+        sub: t('epicHero.hoursDone', { hours: epic.progress.hours.done.toFixed(0) }),
         accentBg: 'linear-gradient(90deg, var(--violet), var(--cyan))',
         fillPct: epic.progress.totalHours > 0
           ? (epic.progress.hours.done / epic.progress.totalHours) * 100
           : 0,
       }),
       statTile({
-        label: 'In Progress',
-        value: [String(epic.progress.counts.inprogress), el('span', { class: 'unit' }, ['tasks'])],
+        label: t('hero.inProgress'),
+        value: [String(epic.progress.counts.inprogress), el('span', { class: 'unit' }, [t('epicHero.tasksUnit')])],
         sub: `${epic.progress.hours.inprogress.toFixed(0)}h`,
         accentBg: 'linear-gradient(90deg, var(--amber), var(--coral))',
         fillPct: epic.progress.totalIssues > 0

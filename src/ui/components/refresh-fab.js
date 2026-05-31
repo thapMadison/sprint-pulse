@@ -3,9 +3,10 @@ import { refreshFromApi } from '../../app/actions.js';
 import { timeAgo } from '../format.js';
 import { attachScrollVisibility } from './scroll-visibility.js';
 import { SOURCE } from '../../app/constants.js';
+import { t } from '../../app/i18n.js';
 
 const statusText = ({ isRefreshing, lastUpdated }) =>
-  isRefreshing ? 'Refreshing...' : `Updated ${timeAgo(lastUpdated)}`;
+  isRefreshing ? t('dataSource.refreshing') : t('dataSource.updated', { time: timeAgo(lastUpdated) });
 
 // Floating refresh button — shown only for the API source and only once the user
 // has scrolled past the in-flow data-source bar (so its Refresh button is off
@@ -22,7 +23,7 @@ export function renderRefreshFAB({ sourceKey, isRefreshing, lastUpdated }) {
       class: 'fab-btn',
       onClick: refreshFromApi,
       disabled: isRefreshing,
-      'aria-label': 'Refresh data',
+      'aria-label': t('dataSource.refreshAria'),
     }, [refreshIcon]),
   ]);
 

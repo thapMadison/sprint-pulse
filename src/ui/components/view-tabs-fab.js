@@ -1,6 +1,7 @@
 import { el } from '../dom.js';
 import { iconSprint, iconEpic, renderTabBtn } from './view-tabs.js';
 import { attachScrollVisibility } from './scroll-visibility.js';
+import { t } from '../../app/i18n.js';
 
 // Floating Sprint/Epic switcher — a compact version of the view tabs that lives
 // at the bottom-left, mirroring the refresh FAB at the bottom-right. Shows after
@@ -11,8 +12,8 @@ import { attachScrollVisibility } from './scroll-visibility.js';
 // the in-flow tabs' gradients.
 export function renderViewTabsFAB({ active, onChange }) {
   const fab = el('div', { class: 'view-tabs view-tabs-fab' }, [
-    renderTabBtn({ key: 'sprint', label: 'Sprint', icon: iconSprint('vtGradSprintFab'), active, onChange }),
-    renderTabBtn({ key: 'epic', label: 'Epic', icon: iconEpic('vtGradEpicFab'), active, onChange }),
+    renderTabBtn({ key: 'sprint', label: t('viewTabs.sprint'), icon: iconSprint('vtGradSprintFab'), active, onChange }),
+    renderTabBtn({ key: 'epic', label: t('viewTabs.epic'), icon: iconEpic('vtGradEpicFab'), active, onChange }),
   ]);
 
   // Show once the in-flow tabs (the .view-tabs that isn't this FAB) scroll above

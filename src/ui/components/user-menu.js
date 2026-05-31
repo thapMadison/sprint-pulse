@@ -1,8 +1,9 @@
 import { el } from '../dom.js';
+import { t } from '../../app/i18n.js';
 
 export function renderUserMenu(user, onLogout) {
   const initial = user.displayName?.charAt(0) || user.email?.charAt(0) || '?';
-  const name = user.displayName || 'User';
+  const name = user.displayName || t('userMenu.defaultName');
   const email = user.email || '';
 
   const chevron = el('span', { class: 'user-chevron' }, ['▾']);
@@ -23,7 +24,7 @@ export function renderUserMenu(user, onLogout) {
     el('div', { class: 'user-dropdown-divider' }, []),
     el('button', { class: 'user-dropdown-item logout', type: 'button', onClick: onLogout }, [
       el('span', { class: 'logout-icon' }, ['⎋']),
-      'Logout',
+      t('userMenu.logout'),
     ]),
   ]);
 

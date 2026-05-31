@@ -8,6 +8,7 @@ import { shortSprintName } from '../ui/format.js';
 import { issueTypeIcon } from '../ui/components/issue-type-icon.js';
 import { filterEpics } from '../domain/epic-filters.js';
 import { STATUS_ORDER } from '../app/constants.js';
+import { t } from '../app/i18n.js';
 
 const MIN_PX_PER_DAY = 6;
 const MAX_PX_PER_DAY = 22;
@@ -21,8 +22,6 @@ const SPRINT_LABEL_MIN_PX = 40;
 let hasScrolledToToday = false;
 // Preserve scroll position across re-renders
 let savedScrollLeft = 0;
-const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function parseDate(s) {
   return new Date(s + 'T00:00:00');
@@ -39,7 +38,7 @@ function toIso(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 function fmtMonthYear(d) {
-  return `${MONTH_ABBR[d.getMonth()]} ${d.getFullYear()}`;
+  return `${t(`month.${d.getMonth()}`)} ${d.getFullYear()}`;
 }
 // Compress a sprint name like "GL APP SPRINT 40" → "S40" so labels fit inside
 // narrow bands instead of overlapping with the next sprint's label.
@@ -91,12 +90,12 @@ function progressMini(epic) {
 
 function statusPill(epic) {
   if (epic.isNoEpic) {
-    return el('span', { class: 'roadmap-status-pill loose' }, ['Loose']);
+    return el('span', { class: 'roadmap-status-pill loose' }, [t('roadmap.loose')]);
   }
   const label =
-    epic.status === 'done' ? 'Done' :
-    epic.status === 'inprogress' ? 'In Prog' :
-    'To Do';
+    epic.status === 'done' ? t('roadmap.statusDone') :
+    epic.status === 'inprogress' ? t('roadmap.statusInProg') :
+    t('roadmap.statusTodo');
   return el('span', { class: `roadmap-status-pill ${epic.status}` }, [label]);
 }
 
@@ -112,7 +111,7 @@ function epicBar(epic, dayToPct, today, onClick) {
   const isLoading = !epic.detailLoaded;
   const clickProps = onClick ? { onClick, style: { cursor: 'pointer' } } : {};
   if (!epic.startDate) {
-    const emptyContent = isLoading ? 'Loading...' : 'Not started';
+    const emptyContent = isLoading ? t('roadmap.loading') : t('roadmap.notStarted');
     return el('div', { class: `roadmap-bar-empty ${isLoading ? 'loading' : ''}`, ...clickProps }, [emptyContent]);
   }
   const ongoing = !epic.endDate;
@@ -122,11 +121,11 @@ function epicBar(epic, dayToPct, today, onClick) {
   const width = Math.max(0, right - left);
   const pct = epic.progress.percent || 0;
   const cls = `roadmap-bar epic ${epic.status} ${ongoing ? 'ongoing' : ''} ${isLoading ? 'loading' : ''}`;
-  const titleSuffix = isLoading ? '\n(Loading detail...)' : '';
+  const titleSuffix = isLoading ? `\n${t('roadmap.loadingDetail')}` : '';
   return el('div', {
     class: cls,
     style: { left: `${left}%`, width: `${width}%`, ...(onClick ? { cursor: 'pointer' } : {}) },
-    title: `${epic.key} · ${epic.name}\n${epic.startDate} → ${epic.endDate || 'ongoing'}\nProgress: ${pct}%${titleSuffix}`,
+    title: `${epic.key} · ${epic.name}\n${epic.startDate} → ${epic.endDate || t('roadmap.barOngoing')}\n${t('roadmap.barProgress')}: ${pct}%${titleSuffix}`,
     ...(onClick ? { onClick } : {}),
   }, [
     el('div', { class: 'roadmap-bar-fill', style: { width: `${pct}%` } }),
@@ -142,7 +141,7 @@ function taskBar(task, dayToPct, today, sprints) {
       return el('div', {
         class: 'roadmap-task-dot',
         style: { left: `calc(${left}% - 3px)` },
-        title: `${task.key} · not started`,
+        title: t('roadmap.taskNotStartedTip', { key: task.key }),
       });
     }
     return null;
@@ -158,7 +157,7 @@ function taskBar(task, dayToPct, today, sprints) {
   return el('div', {
     class: cls,
     style: { left: `${left}%`, width: `${width}%` },
-    title: `${task.key} · ${task.statusName || task.status}\nStart: ${task.startedDate}${task.doneDate ? `\nDone: ${task.doneDate}` : '\nOngoing'}`,
+    title: `${task.key} · ${task.statusName || task.status}\n${t('roadmap.tipStart')}: ${task.startedDate}${task.doneDate ? `\n${t('roadmap.tipDone')}: ${task.doneDate}` : `\n${t('roadmap.tipOngoing')}`}`,
   });
 }
 
@@ -237,19 +236,19 @@ function todayMarker(today, dayToPct) {
   return el('div', {
     class: 'roadmap-today',
     style: { left: `${pct}%` },
-  }, [el('span', { class: 'roadmap-today-label' }, ['Today'])]);
+  }, [el('span', { class: 'roadmap-today-label' }, [t('roadmap.today')])]);
 }
 
 function epicRow({ epic, expanded, dayToPct, today, jiraUrl, onToggle, onOpenDetail }) {
   const keyNode = (jiraUrl && !epic.isNoEpic)
     ? el('a', { href: `${jiraUrl}/browse/${epic.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'roadmap-key jira-key-link', onClick: (e) => e.stopPropagation() }, [epic.key])
-    : el('span', { class: 'roadmap-key' }, [epic.isNoEpic ? 'NO EPIC' : epic.key]);
+    : el('span', { class: 'roadmap-key' }, [epic.isNoEpic ? t('roadmap.noEpic') : epic.key]);
 
   const left = el('div', { class: 'roadmap-row-left epic-left' }, [
     el('button', {
       class: `roadmap-chevron-btn ${expanded ? 'open' : ''}`,
       type: 'button',
-      'aria-label': expanded ? 'Collapse' : 'Expand',
+      'aria-label': expanded ? t('roadmap.collapse') : t('roadmap.expand'),
       onClick: (e) => { e.stopPropagation(); onToggle(epic.id); },
     }, [chevron(expanded)]),
     el('div', { class: 'roadmap-meta roadmap-meta-clickable', onClick: () => onOpenDetail(epic.id) }, [
@@ -262,8 +261,8 @@ function epicRow({ epic, expanded, dayToPct, today, jiraUrl, onToggle, onOpenDet
         class: 'roadmap-name-btn',
         type: 'button',
         onClick: (e) => { e.stopPropagation(); onOpenDetail(epic.id); },
-        title: 'Open details',
-      }, [epic.name]),
+        title: t('roadmap.openDetails'),
+      }, [epic.isNoEpic ? t('roadmap.noEpicName') : epic.name]),
       progressMini(epic),
     ]),
   ]);
@@ -305,12 +304,12 @@ export function renderEpicRoadmap({
   if (!filtered.length) {
     return el('div', { class: 'card roadmap-card' }, [
       el('h3', { class: 'card-title' }, [
-        el('span', {}, ['Portfolio Roadmap']),
+        el('span', {}, [t('roadmap.title')]),
       ]),
       el('p', { class: 'roadmap-empty' }, [
         epics.length
-          ? 'No epics match the current filters.'
-          : 'No epics yet. Once data loads they will appear here.',
+          ? t('roadmap.emptyFiltered')
+          : t('roadmap.empty'),
       ]),
     ]);
   }
@@ -409,25 +408,25 @@ export function renderEpicRoadmap({
   const totalTasksExpanded = rows.length - filtered.length;
   return el('div', { class: 'card roadmap-card' }, [
     el('h3', { class: 'card-title' }, [
-      el('span', {}, ['Portfolio Roadmap']),
+      el('span', {}, [t('roadmap.title')]),
       el('span', {
         style: {
           font: '400 11px var(--font-mono)', color: 'var(--ink-3)',
           letterSpacing: '0.05em', textTransform: 'none',
         },
       }, [
-        `${filtered.length}/${epics.length} epic${epics.length !== 1 ? 's' : ''}` +
-        (totalTasksExpanded ? ` · ${totalTasksExpanded} task${totalTasksExpanded !== 1 ? 's' : ''} shown` : ''),
+        t('roadmap.count', { filtered: filtered.length, total: epics.length, count: epics.length }) +
+        (totalTasksExpanded ? t('roadmap.tasksShown', { count: totalTasksExpanded }) : ''),
       ]),
     ]),
     scrollEl,
     el('div', { class: 'roadmap-legend' }, [
-      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw done' }), 'Done']),
-      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw inprog' }), 'In progress']),
-      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw todo' }), 'Not started']),
-      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw ongoing' }), 'Ongoing (no end)']),
-      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw sprint-band' }), 'Sprint span']),
-      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw today-line' }), 'Today']),
+      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw done' }), t('roadmap.legendDone')]),
+      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw inprog' }), t('roadmap.legendInProgress')]),
+      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw todo' }), t('roadmap.legendNotStarted')]),
+      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw ongoing' }), t('roadmap.legendOngoing')]),
+      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw sprint-band' }), t('roadmap.legendSprintSpan')]),
+      el('span', { class: 'legend-item' }, [el('span', { class: 'legend-sw today-line' }), t('roadmap.legendToday')]),
     ]),
   ]);
 }

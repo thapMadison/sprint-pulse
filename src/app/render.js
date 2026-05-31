@@ -25,10 +25,11 @@ import { renderDonut } from '../charts/donut.js';
 import { renderEpicRoadmap } from '../charts/epic-roadmap.js';
 
 import { getState, activeSprint, DEFAULT_EPIC_FILTERS, subscribeEpicRoadmap } from './state.js';
+import { t } from './i18n.js';
 import {
   login, logout, setActiveSprint, setView,
   toggleEpicExpanded, openEpicDetail, closeEpicDetail,
-  setEpicFilter, setEpicSearchSilent, ensureEpicsLoaded,
+  setEpicFilter, setEpicSearchSilent, ensureEpicsLoaded, setLanguage,
 } from './actions.js';
 
 // ─── Body-panel navigation stack ──────────────────────────────────────────
@@ -104,70 +105,48 @@ function openTaskPanel(issue, backAction) {
   renderNavTop();
 }
 
+// Chart tooltip content keyed by i18n string keys. Resolved via t() at render
+// time (not here) so a language switch updates the popovers on the next render.
 const CHART_TOOLTIPS = {
   burndown: {
-    title: 'Burndown Chart',
-    subtitle: 'Track remaining work against the ideal pace',
+    titleKey: 'tip.burndown.title',
+    subtitleKey: 'tip.burndown.subtitle',
     accent: 'coral',
     sections: [
-      {
-        label: 'What it shows',
-        body: 'The remaining effort (in hours) of all sprint issues, plotted day by day. The dashed line is the ideal pace — a straight drop from total scope to zero by sprint end.',
-      },
-      {
-        label: 'How to read it',
-        body: 'When the solid line stays above the dashed line, the team is behind. When it dips below, the team is ahead. A flat segment means no work was completed that day.',
-      },
+      { labelKey: 'tip.sectionWhat', bodyKey: 'tip.burndown.what' },
+      { labelKey: 'tip.sectionHow', bodyKey: 'tip.burndown.how' },
     ],
-    tip: 'If your actual line ends well above zero, scope may have been too large or blockers slowed delivery. Use it to discuss capacity in retrospective.',
+    tipKey: 'tip.burndown.tip',
   },
   cfd: {
-    title: 'Cumulative Flow Diagram',
-    subtitle: 'See how work moves through stages',
+    titleKey: 'tip.cfd.title',
+    subtitleKey: 'tip.cfd.subtitle',
     accent: 'amber',
     sections: [
-      {
-        label: 'What it shows',
-        body: 'Stacked bands representing the number of issues in each status (To Do, In Progress, Done) over time. Total height equals total scope.',
-      },
-      {
-        label: 'How to read it',
-        body: 'Read the vertical thickness of each band as the count of issues in that status. The "Done" band growing means work is being completed. A flat "Done" band means delivery is stalled.',
-      },
+      { labelKey: 'tip.sectionWhat', bodyKey: 'tip.cfd.what' },
+      { labelKey: 'tip.sectionHow', bodyKey: 'tip.cfd.how' },
     ],
-    tip: 'A widening "In Progress" band signals a bottleneck — too many things started, not enough finished. Encourage the team to focus on closing items before pulling new ones.',
+    tipKey: 'tip.cfd.tip',
   },
   burnup: {
-    title: 'Burnup Chart',
-    subtitle: 'Compare what is done against total scope',
+    titleKey: 'tip.burnup.title',
+    subtitleKey: 'tip.burnup.subtitle',
     accent: 'lime',
     sections: [
-      {
-        label: 'What it shows',
-        body: 'Two lines: total scope (hours added to the sprint) and completed work. The gap between them is how much is left to do.',
-      },
-      {
-        label: 'How to read it',
-        body: 'The scope line should be relatively flat. If it rises mid-sprint, that is scope creep — new work was added after the sprint started. The completed line should rise toward the scope line by sprint end.',
-      },
+      { labelKey: 'tip.sectionWhat', bodyKey: 'tip.burnup.what' },
+      { labelKey: 'tip.sectionHow', bodyKey: 'tip.burnup.how' },
     ],
-    tip: 'Unlike Burndown, Burnup separates scope changes from progress. If both lines rise together, the team is delivering but also taking on more work.',
+    tipKey: 'tip.burnup.tip',
   },
   control: {
-    title: 'Control Chart',
-    subtitle: 'Measure how long each issue takes',
+    titleKey: 'tip.control.title',
+    subtitleKey: 'tip.control.subtitle',
     accent: 'violet',
     sections: [
-      {
-        label: 'What it shows',
-        body: 'Each dot is one completed issue, plotted by its cycle time (days from "In Progress" to "Done"). The horizontal line is the team average (μ), and the shaded band shows ±2 standard deviations.',
-      },
-      {
-        label: 'How to read it',
-        body: 'Most dots should fall inside the band — that is normal variation. Dots outside the band are outliers worth investigating. A lower mean over time means the team is delivering faster.',
-      },
+      { labelKey: 'tip.sectionWhat', bodyKey: 'tip.control.what' },
+      { labelKey: 'tip.sectionHow', bodyKey: 'tip.control.how' },
     ],
-    tip: 'Outliers are not bad — they are conversations. Ask: was this issue too large, was someone stuck, or did we underestimate? Use insights to improve sizing.',
+    tipKey: 'tip.control.tip',
   },
 };
 
@@ -177,16 +156,16 @@ function renderChartTooltip(key) {
 
   const sections = info.sections.map((s) =>
     el('div', { class: 'chart-tooltip-section' }, [
-      el('div', { class: 'chart-tooltip-section-label' }, [s.label]),
-      el('p', { class: 'chart-tooltip-section-body' }, [s.body]),
+      el('div', { class: 'chart-tooltip-section-label' }, [t(s.labelKey)]),
+      el('p', { class: 'chart-tooltip-section-body' }, [t(s.bodyKey)]),
     ])
   );
 
   const popover = el('div', { class: `chart-tooltip-popover accent-${info.accent}` }, [
     el('div', { class: 'chart-tooltip-arrow' }),
     el('div', { class: 'chart-tooltip-header' }, [
-      el('div', { class: 'chart-tooltip-title' }, [info.title]),
-      el('div', { class: 'chart-tooltip-subtitle' }, [info.subtitle]),
+      el('div', { class: 'chart-tooltip-title' }, [t(info.titleKey)]),
+      el('div', { class: 'chart-tooltip-subtitle' }, [t(info.subtitleKey)]),
     ]),
     el('div', { class: 'chart-tooltip-body' }, sections),
     el('div', { class: 'chart-tooltip-tip' }, [
@@ -202,8 +181,8 @@ function renderChartTooltip(key) {
         ]),
       ]),
       el('div', { class: 'tip-text' }, [
-        el('span', { class: 'tip-label' }, ['Pro tip']),
-        el('span', {}, [info.tip]),
+        el('span', { class: 'tip-label' }, [t('tip.proTip')]),
+        el('span', {}, [t(info.tipKey)]),
       ]),
     ]),
   ]);
@@ -230,7 +209,7 @@ function renderChartTooltip(key) {
   const btn = el('button', {
     class: `chart-info-btn accent-${info.accent}`,
     type: 'button',
-    'aria-label': `About ${info.title}`,
+    'aria-label': t('tip.about', { title: t(info.titleKey) }),
   }, []);
   btn.appendChild(iconSvg);
 
@@ -287,7 +266,7 @@ function renderStatusCard(sprint) {
   }
   return el('div', { class: 'card' }, [
     el('h3', { class: 'card-title' }, [
-      el('span', {}, ['Status by Category']),
+      el('span', {}, [t('app.statusByCategory')]),
       el('span', { class: 'accent' }),
     ]),
     renderDonut({
@@ -301,7 +280,7 @@ function renderSprintSkeleton(sprint) {
   return [
     el('div', { class: 'banner info sprint-load-banner' }, [
       el('span', { class: 'spinner-mini' }),
-      el('span', {}, [`Loading ${sprint?.name || 'sprint'} data…`]),
+      el('span', {}, [t('app.loadingSprint', { name: sprint?.name || t('app.sprintFallback') })]),
     ]),
     el('div', { class: 'row cols-2' }, [ghostCard(), ghostCard()]),
     el('div', { class: 'row cols-2' }, [ghostCard(), ghostCard()]),
@@ -315,7 +294,7 @@ function renderEpicLoadingBanner(progress) {
   return el('div', { class: 'banner info epic-load-banner' }, [
     el('div', { class: 'epic-load-row' }, [
       el('span', { class: 'spinner-mini' }),
-      el('span', { class: 'epic-load-label' }, [progress.label || 'Loading epic data…']),
+      el('span', { class: 'epic-load-label' }, [progress.labelKey ? t(progress.labelKey) : t('action.loadingEpicData')]),
       hasStep
         ? el('span', { class: 'epic-load-step' }, [`${progress.step}/${progress.total}`])
         : null,
@@ -346,12 +325,12 @@ function buildSprintContent(s) {
     out.push(hero);
 
     out.push(el('div', { class: 'row cols-2' }, [
-      chartCard('Burndown', renderBurndown(series), 'burndown'),
-      chartCard('Cumulative Flow', renderCFD(series), 'cfd'),
+      chartCard(t('app.chartBurndown'), renderBurndown(series), 'burndown'),
+      chartCard(t('app.chartCumulativeFlow'), renderCFD(series), 'cfd'),
     ]));
     out.push(el('div', { class: 'row cols-2' }, [
-      chartCard('Burnup', renderBurnup(series), 'burnup'),
-      chartCard('Control Chart', renderControl(series), 'control'),
+      chartCard(t('app.chartBurnup'), renderBurnup(series), 'burnup'),
+      chartCard(t('app.chartControl'), renderControl(series), 'control'),
     ]));
     out.push(el('div', { class: 'row' }, [renderWorkloadTable({ sprint, jiraUrl: s.jiraUrl, onOpenTask: openTaskPanel })]));
   }
@@ -442,7 +421,7 @@ function renderEpicView() {
     children.push(renderEpicLoadingBanner(s.epicLoadProgress));
   }
   if (s.epicError) {
-    children.push(el('div', { class: 'banner error' }, [`Epic data: ${s.epicError}`]));
+    children.push(el('div', { class: 'banner error' }, [t('app.epicDataError', { error: s.epicError })]));
   }
 
   const visibleEpics = filterEpics(s.epics, s.epicFilters).length;
@@ -476,7 +455,7 @@ function renderEpicView() {
 
   if (!s.epics.length && !s.epicLoadProgress) {
     children.push(el('div', { class: 'banner info' }, [
-      'No epics yet. Once data loads they will appear in the roadmap above.',
+      t('app.noEpicsYet'),
     ]));
   }
 
@@ -497,8 +476,8 @@ function chartCard(title, body, tooltipKey) {
 function topbar() {
   const s = getState();
   return renderTopbar({
-    today: s.today, sourceLabel: s.sourceLabel, user: s.user,
-    onLogin: login, onLogout: logout,
+    today: s.today, sourceLabel: s.sourceLabel, user: s.user, lang: s.lang,
+    onLogin: login, onLogout: logout, onLangChange: setLanguage,
   });
 }
 
@@ -586,7 +565,7 @@ export function render() {
       topbar(),
       dataSourceBar(),
       el('div', { class: 'banner info' }, [
-        'No sprints found in the loaded data. Try a different source or sprint filter.',
+        t('app.noSprintsFound'),
       ]),
     ]));
     return;
@@ -603,8 +582,7 @@ export function render() {
   }
 
   children.push(el('footer', { class: 'footer' }, [
-    el('span', {}, ['Sprint Pulse · Jira Analytics']),
-    el('span', { style: { textTransform: 'none' } }, ['Idea by Phuong Phan']),
+    el('span', {}, [t('app.footer')]),
   ]));
 
   root.appendChild(el('div', { class: 'app' }, children));

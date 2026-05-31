@@ -1,9 +1,16 @@
 import { DEMO_SPRINTS, DEMO_TODAY } from '../data/demo.js';
 import { VIEW, SOURCE } from './constants.js';
+import { DEFAULT_LANG, LANG_STORAGE_KEY, setActiveLang, t } from './i18n.js';
 
 // Epic view filters in their "show everything" default. Reused wherever the Epic
 // view is reset (new data source, refresh, logout) so the shape lives in one place.
 export const DEFAULT_EPIC_FILTERS = { status: 'all', sprintId: 'all', search: '' };
+
+// Resolve the persisted language and activate it before building the initial
+// state, so the first paint (including the demo source label below) is already
+// in the user's chosen language. main.js re-syncs <html lang> on boot too.
+const initialLang = (typeof localStorage !== 'undefined' ? localStorage.getItem(LANG_STORAGE_KEY) : null) || DEFAULT_LANG;
+setActiveLang(initialLang);
 
 const state = {
   sprints: DEMO_SPRINTS,
@@ -11,7 +18,7 @@ const state = {
   today: DEMO_TODAY,
   sourceKey: SOURCE.DEMO,
   sourceId: null, // board id (api) or file name (file) — identifies the source for caching
-  sourceLabel: 'Demo · synced',
+  sourceLabel: t('action.demoSynced'),
   error: null,
   lastUpdated: null,
   isRefreshing: false,
@@ -19,6 +26,7 @@ const state = {
   showLoginPrompt: false,
   apiPanelOpen: false,
   jiraUrl: (typeof localStorage !== 'undefined' ? localStorage.getItem('sprint_pulse_jira_url') : null) || null,
+  lang: (typeof localStorage !== 'undefined' ? localStorage.getItem(LANG_STORAGE_KEY) : null) || DEFAULT_LANG,
   pendingBoardId: '',
   loadProgress: null,
   // Epic view state

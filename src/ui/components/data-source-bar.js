@@ -7,13 +7,14 @@ import {
 import { renderProgressOverlay } from './progress-overlay.js';
 import { timeAgo } from '../format.js';
 import { SOURCE } from '../../app/constants.js';
+import { t } from '../../app/i18n.js';
 
 function statusText({ activeSource, isRefreshing, lastUpdated }) {
   if (activeSource === SOURCE.API) {
-    return isRefreshing ? 'Refreshing...' : `Updated ${timeAgo(lastUpdated)}`;
+    return isRefreshing ? t('dataSource.refreshing') : t('dataSource.updated', { time: timeAgo(lastUpdated) });
   }
-  if (activeSource === SOURCE.FILE) return 'Loaded from file';
-  return 'Using bundled demo';
+  if (activeSource === SOURCE.FILE) return t('dataSource.loadedFromFile');
+  return t('dataSource.usingDemo');
 }
 
 function hiddenFileInput() {
@@ -35,7 +36,7 @@ function hiddenFileInput() {
 
 // Strip the "Jira API · " prefix so the chip shows just the board name/id.
 function shortBoardLabel(label, boardId) {
-  if (!label) return `Board ${boardId}`;
+  if (!label) return t('dataSource.boardFallback', { id: boardId });
   return label.replace(/^Jira API · /, '');
 }
 
@@ -50,7 +51,7 @@ function buildRecentDropdown({ recentBoards, activeBoardId }) {
   const items = others.map((b) => {
     const item = el('button', {
       class: 'board-recent-item', type: 'button',
-      title: `Load board ${b.boardId} (cached)`,
+      title: t('dataSource.loadBoardCached', { id: b.boardId }),
     }, [
       el('span', { class: 'board-recent-name' }, [shortBoardLabel(b.label, b.boardId)]),
       el('span', { class: 'board-recent-id' }, [`#${b.boardId}`]),
@@ -60,7 +61,7 @@ function buildRecentDropdown({ recentBoards, activeBoardId }) {
   });
 
   const dropdown = el('div', { class: 'board-recent-dropdown' }, [
-    el('div', { class: 'board-recent-head' }, ['Recent boards']),
+    el('div', { class: 'board-recent-head' }, [t('dataSource.recentBoards')]),
     ...items,
   ]);
   // Keep the input focused on click so the click lands before blur closes us.
@@ -73,30 +74,30 @@ function buildInlineBoardInput({ pendingBoardId, workerUrl, recentBoards }) {
 
   const boardIdInput = el('input', {
     class: 'inline-board-input',
-    placeholder: '123',
+    placeholder: t('dataSource.boardPlaceholder'),
     value: savedBoardId,
   });
   boardIdInput.addEventListener('input', () => setPendingBoardId(boardIdInput.value));
 
-  const submit = el('button', { class: 'submit-board', type: 'button' }, ['Load board']);
+  const submit = el('button', { class: 'submit-board', type: 'button' }, [t('dataSource.loadBoard')]);
   submit.addEventListener('click', async () => {
     const boardId = boardIdInput.value.trim();
     if (!workerUrl) return;
     submit.disabled = true;
-    submit.textContent = 'Connecting…';
+    submit.textContent = t('dataSource.connecting');
     try {
       await loadFromApi(boardId);
     } finally {
       submit.disabled = false;
-      submit.textContent = 'Load board';
+      submit.textContent = t('dataSource.loadBoard');
     }
   });
 
   const field = el('div', {
     class: 'inline-board-field',
-    'data-tooltip': 'Board ID can be found in your Jira board URL:\n/jira/software/projects/XXX/boards/{boardId}',
+    'data-tooltip': t('dataSource.boardTooltip'),
   }, [
-    el('label', { class: 'inline-board-label' }, ['Board ID']),
+    el('label', { class: 'inline-board-label' }, [t('dataSource.boardLabel')]),
     boardIdInput,
     submit,
   ]);
@@ -109,7 +110,7 @@ function buildInlineBoardInput({ pendingBoardId, workerUrl, recentBoards }) {
 
     const caret = el('button', {
       class: 'recent-toggle', type: 'button',
-      title: 'Recent boards', 'aria-label': 'Recent boards',
+      title: t('dataSource.recentBoards'), 'aria-label': t('dataSource.recentBoards'),
     }, ['▾']);
     caret.addEventListener('click', () => {
       if (dropdown.classList.contains('open')) dropdown.classList.remove('open');
@@ -145,31 +146,31 @@ export function renderDataSource({
         setApiPanelOpen(false);
         loadDemo();
       },
-    }, ['Demo data']);
+    }, [t('dataSource.demo')]);
 
     const apiBtn = el('button', {
       class: `ds-btn ${activeSource === SOURCE.API || apiPanelOpen ? 'active' : ''} ${!authed ? 'disabled' : ''}`,
       onClick: () => {
         if (!authed) {
-          showError('Please login to connect to Jira API.');
+          showError(t('dataSource.loginForApi'));
           requireLogin();
           return;
         }
         setApiPanelOpen(!apiPanelOpen);
       },
-    }, ['Connect with Jira']);
+    }, [t('dataSource.connectJira')]);
 
     const fileBtn = el('button', {
       class: `ds-btn ${activeSource === SOURCE.FILE && !apiPanelOpen ? 'active' : ''} ${!authed ? 'disabled' : ''}`,
       onClick: () => {
         if (!authed) {
-          showError('Please login to import files.');
+          showError(t('dataSource.loginForFile'));
           requireLogin();
           return;
         }
         fileInput.click();
       },
-    }, ['Import CSV / XML / JSON']);
+    }, [t('dataSource.importFile')]);
 
     const refresh = el('button', {
       class: `ds-btn refresh-btn ${isRefreshing ? 'refreshing' : ''}`,
@@ -177,7 +178,7 @@ export function renderDataSource({
       disabled: isRefreshing,
     }, [
       el('span', { class: 'refresh-icon' }, ['↻']),
-      'Refresh',
+      t('dataSource.refresh'),
     ]);
 
     const progressNode = renderProgressOverlay({ progress: loadProgress });
@@ -200,14 +201,14 @@ export function renderDataSource({
     }
 
     return el('div', { class: 'data-source-bar' }, [
-      el('span', { class: 'ds-label' }, ['Data source']),
+      el('span', { class: 'ds-label' }, [t('dataSource.label')]),
       demoBtn, apiBtn, fileBtn, fileInput,
       trailing,
     ]);
   }
 
   if (apiPanelOpen && isAuthenticated()) {
-    const loadingBar = paintBar(el('span', { class: 'ds-status' }, ['Loading config...']));
+    const loadingBar = paintBar(el('span', { class: 'ds-status' }, [t('dataSource.loadingConfig')]));
     container.appendChild(loadingBar);
 
     (async () => {
@@ -219,7 +220,7 @@ export function renderDataSource({
         container.appendChild(paintBar(inlineBoardEl));
       } catch (e) {
         container.innerHTML = '';
-        container.appendChild(paintBar(el('span', { class: 'ds-status err' }, [`Error: ${e.message}`])));
+        container.appendChild(paintBar(el('span', { class: 'ds-status err' }, [t('dataSource.error', { message: e.message })])));
       }
     })();
   } else {

@@ -16,6 +16,7 @@ import {
 import { setState, setStateSilent, setEpicRoadmapState, setEpicViewState, setSprintViewState, setLoadProgressState, setDataSourceState, getState, DEFAULT_EPIC_FILTERS } from './state.js';
 import { DEMO_EPICS } from '../data/demo.js';
 import { VIEW, SOURCE } from './constants.js';
+import { setActiveLang, isSupported, LANG_STORAGE_KEY, t } from './i18n.js';
 
 const BOARD_ID_KEY = 'jira_board_id';
 
@@ -31,7 +32,7 @@ function demoSourceState() {
     today: DEMO_TODAY,
     sourceKey: SOURCE.DEMO,
     sourceId: null,
-    sourceLabel: 'Demo · synced',
+    sourceLabel: t('action.demoSynced'),
     lastUpdated: null,
   };
 }
@@ -123,7 +124,7 @@ function restoreSnapshot(snap, extra = {}) {
 // Prefer the human-readable board name; fall back to the numeric id.
 function apiSourceLabel(board, boardId) {
   const name = board && board.name ? board.name.trim() : '';
-  return name ? `Jira API · ${name}` : `Jira API · Board ${boardId}`;
+  return name ? t('action.jiraApiName', { name }) : t('action.jiraApiBoard', { boardId });
 }
 
 function pickInitialSprintId(sprints) {
@@ -161,9 +162,9 @@ async function loadSprintDetail(sprintId) {
   if (!sprint || sprint.issuesLoaded) return;
 
   const workerUrl = await getWorkerUrl();
-  if (!workerUrl) { markSprintLoaded(sprintId, 'Worker URL not configured.'); return; }
+  if (!workerUrl) { markSprintLoaded(sprintId, t('action.workerNotConfigured')); return; }
   const boardId = localStorage.getItem(BOARD_ID_KEY);
-  if (!boardId) { markSprintLoaded(sprintId, 'Board ID not set.'); return; }
+  if (!boardId) { markSprintLoaded(sprintId, t('action.boardIdNotSet')); return; }
 
   // Resolve the Jira numeric sprint ID. Shells carry jiraId from /sprints; fall
   // back to a name lookup just in case it's missing.
@@ -174,7 +175,7 @@ async function loadSprintDetail(sprintId) {
       jiraId = (list || []).find((sp) => sp.name === sprint.name)?.id;
     } catch { /* fall through to error below */ }
   }
-  if (!jiraId) { markSprintLoaded(sprintId, 'Could not resolve Jira sprint id.'); return; }
+  if (!jiraId) { markSprintLoaded(sprintId, t('action.couldNotResolveSprint')); return; }
 
   try {
     const data = await fetchSprintFromWorker(workerUrl, jiraId, boardId);
@@ -208,9 +209,21 @@ export function setView(view) {
   }
 }
 
-export function setActiveEpic(id) {
-  setState({ activeEpicId: id });
+// Switch UI language. Flips the i18n lookup target, persists the choice, and
+// triggers a full re-render so every component re-reads its strings. No-op for an
+// unsupported code. Side-effects (localStorage, render) live here per AGENTS.md.
+export function setLanguage(code) {
+  if (!isSupported(code) || code === getState().lang) return;
+  const lang = setActiveLang(code);
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(LANG_STORAGE_KEY, lang);
+  } catch { /* storage may be unavailable (private mode) — non-fatal */ }
+  if (typeof document !== 'undefined') document.documentElement.lang = lang;
+  setState({ lang });
 }
+
+export function setActiveEpic(id) {
+  setState({ activeEpicId: id });}
 
 export function toggleEpicExpanded(id) {
   const next = new Set(getState().expandedEpicIds);
@@ -283,12 +296,12 @@ async function loadEpicsAndChangelogs() {
   // API mode: two-phase loading
   const workerUrl = await getWorkerUrl();
   if (!workerUrl) {
-    setEpicViewState({ epicError: 'Worker URL not configured.' });
+    setEpicViewState({ epicError: t('action.workerNotConfigured') });
     return;
   }
   const boardId = localStorage.getItem(BOARD_ID_KEY);
   if (!boardId) {
-    setEpicViewState({ epicError: 'Board ID not set.' });
+    setEpicViewState({ epicError: t('action.boardIdNotSet') });
     return;
   }
 
@@ -296,7 +309,7 @@ async function loadEpicsAndChangelogs() {
     // ═══════════════════════════════════════════════════════════════════════
     // PHASE 1: Immediate render with lightweight epics
     // ═══════════════════════════════════════════════════════════════════════
-    setEpicViewState({ epicError: null, epicLoadProgress: { phase: 1, label: 'Loading epic list…' } });
+    setEpicViewState({ epicError: null, epicLoadProgress: { phase: 1, labelKey: 'action.loadingEpicList' } });
 
     let rawEpics = [];
     try {
@@ -397,11 +410,11 @@ export function clearError() {
 }
 
 const LOAD_STEPS = {
-  connect:  { label: 'Connecting to Jira…',     percent: 15 },
-  fetch:    { label: 'Pulling sprint data…',    percent: 55 },
-  process:  { label: 'Converting issues…',      percent: 85 },
-  done:     { label: 'Done',                    percent: 100 },
-  parse:    { label: 'Reading file…',           percent: 35 },
+  connect:  { labelKey: 'action.connectingToJira',  percent: 15 },
+  fetch:    { labelKey: 'action.pullingSprintData', percent: 55 },
+  process:  { labelKey: 'action.convertingIssues',  percent: 85 },
+  done:     { labelKey: 'action.done',              percent: 100 },
+  parse:    { labelKey: 'action.readingFile',       percent: 35 },
 };
 
 function setProgress(step, flow) {
@@ -417,7 +430,7 @@ function setProgress(step, flow) {
   // first step falls back to a full render to create the bar.
   setLoadProgressState({
     loadProgress: {
-      step, label: meta.label, percent: meta.percent,
+      step, labelKey: meta.labelKey, percent: meta.percent,
       flow: flow || prevFlow || 'api',
     },
   });
@@ -442,7 +455,7 @@ export async function login() {
   try {
     await signInWithMicrosoft();
   } catch (e) {
-    setState({ error: `Login failed: ${e.message}` });
+    setState({ error: t('action.loginFailed', { error: e.message }) });
   }
 }
 
@@ -468,7 +481,7 @@ export async function logout() {
       ...freshEpicUi(),
     });
   } catch (e) {
-    setState({ error: `Logout failed: ${e.message}` });
+    setState({ error: t('action.logoutFailed', { error: e.message }) });
   }
 }
 
@@ -493,7 +506,7 @@ export async function loadFromFile(file) {
     persistCurrent();
     setProgress('parse', 'file');
     const rawIssues = await parseFile(file);
-    if (!rawIssues.length) throw new Error('File parsed but contained no issues.');
+    if (!rawIssues.length) throw new Error(t('action.fileNoIssues'));
     setProgress('process');
     const sprints = buildSprintsFromIssues(rawIssues, getState().today);
     // Close the Jira board panel if it was left open — otherwise the Board ID
@@ -517,7 +530,7 @@ export async function loadFromFile(file) {
 async function fetchAndApplyBoard(boardId, { extra = {}, keepActiveId = null } = {}) {
   setProgress('connect', 'api');
   const workerUrl = await getWorkerUrl();
-  if (!workerUrl) throw new Error('Worker URL not configured in Firebase database.');
+  if (!workerUrl) throw new Error(t('action.workerNotConfiguredFirebase'));
   const jiraUrl = await getJiraUrl().catch(() => null);
 
   localStorage.setItem(BOARD_ID_KEY, boardId);
@@ -529,7 +542,7 @@ async function fetchAndApplyBoard(boardId, { extra = {}, keepActiveId = null } =
     fetchSprintListFromWorker(workerUrl, boardId),
   ]);
   if (!rawSprints || !rawSprints.length) {
-    throw new Error('No sprints found. Check Board ID and Worker configuration.');
+    throw new Error(t('action.noSprintsCheckConfig'));
   }
 
   setProgress('process');
@@ -547,7 +560,7 @@ async function fetchAndApplyBoard(boardId, { extra = {}, keepActiveId = null } =
 
 export async function loadFromApi(boardId) {
   if (!boardId) {
-    showError('Please enter your Jira Board ID.');
+    showError(t('action.enterBoardId'));
     return false;
   }
   // Preserve the source we're leaving (e.g. another board) before switching.
@@ -580,13 +593,13 @@ export async function loadFromApi(boardId) {
 
 export async function refreshFromApi() {
   if (!isAuthenticated()) {
-    showError('Please login to refresh data.');
+    showError(t('action.loginToRefresh'));
     requireLogin();
     return;
   }
   const boardId = localStorage.getItem(BOARD_ID_KEY);
   if (!boardId) {
-    showError('Board ID not set. Please connect to Jira API first and enter your Board ID.');
+    showError(t('action.boardIdNotSetConnect'));
     return;
   }
 

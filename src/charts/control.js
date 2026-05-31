@@ -1,6 +1,7 @@
 import { svg } from './svg.js';
 import { el } from '../ui/dom.js';
 import { chartGeometry, buildXs, yScaleOf, renderGridAndAxes } from '../ui/chart-helpers.js';
+import { t } from '../app/i18n.js';
 
 export function renderControl(series) {
   const geom = chartGeometry({ H: 260 });
@@ -14,7 +15,7 @@ export function renderControl(series) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         color: 'var(--ink-3)', fontFamily: 'var(--font-mono)', fontSize: '12px',
       },
-    }, ['No completed issues yet']);
+    }, [t('chart.control.empty')]);
   }
 
   const mean = controlPoints.reduce((s, p) => s + p.cycleTime, 0) / controlPoints.length;
@@ -69,7 +70,7 @@ export function renderControl(series) {
     class: 'axis-text',
     x: W - PAD.r - 4, y: yScale(mean) - 4,
     'text-anchor': 'end', fill: 'var(--cyan)',
-  }, [`μ = ${mean.toFixed(1)}d`]));
+  }, [t('chart.control.mean', { mean: mean.toFixed(1) })]));
 
   return el('div', { class: 'chart-wrap tall' }, [
     svg('svg', {
@@ -81,18 +82,18 @@ export function renderControl(series) {
           class: 'legend-sw',
           style: { background: 'var(--violet)', borderRadius: '999px', height: '8px', width: '8px' },
         }),
-        'Issue cycle time',
+        t('chart.control.cycleTime'),
       ]),
       el('span', { class: 'legend-item' }, [
         el('span', {
           class: 'legend-sw',
           style: { background: 'var(--coral)', borderRadius: '999px', height: '8px', width: '8px' },
         }),
-        'Outlier',
+        t('chart.control.outlier'),
       ]),
       el('span', { class: 'legend-item' }, [
         el('span', { class: 'legend-sw dashed', style: { color: 'var(--cyan)' } }),
-        'Mean (μ ±2σ)',
+        t('chart.control.meanBand'),
       ]),
     ]),
   ]);

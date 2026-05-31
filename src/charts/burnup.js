@@ -1,4 +1,5 @@
 import { renderAreaLineChart } from './area-line-chart.js';
+import { t } from '../app/i18n.js';
 
 // Sprint scope vs. cumulative completed effort.
 export function renderBurnup(series) {
@@ -11,7 +12,7 @@ export function renderBurnup(series) {
     areaClass: 'area-completed',
     refColor: 'var(--cyan)',
     actualColor: 'var(--lime)',
-    refLabel: 'Scope (h)',
-    actualLabel: 'Completed (h)',
+    refLabel: t('chart.burnup.scope'),
+    actualLabel: t('chart.burnup.completed'),
   });
 }

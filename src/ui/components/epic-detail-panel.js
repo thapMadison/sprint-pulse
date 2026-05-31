@@ -3,11 +3,12 @@ import { renderEpicHero } from './epic-hero.js';
 import { renderEpicTasksTable } from './epic-tasks-table.js';
 import { renderDonut } from '../../charts/donut.js';
 import { renderPanelShell } from './panel-shell.js';
+import { t } from '../../app/i18n.js';
 
 function donutCard(epic) {
   return el('div', { class: 'card' }, [
     el('h3', { class: 'card-title' }, [
-      el('span', {}, ['Status by Category']),
+      el('span', {}, [t('panel.statusByCategory')]),
       el('span', { class: 'accent' }),
     ]),
     renderDonut({
@@ -29,8 +30,8 @@ export function renderEpicDetailPanel({ epic, today, onClose, jiraUrl, onOpenTas
 
   return renderPanelShell({
     panelClass: 'epic-detail-panel',
-    ariaLabel: `Details for ${epic.name}`,
-    closeLabel: 'Close details',
+    ariaLabel: t('panel.detailsFor', { name: epic.isNoEpic ? t('roadmap.noEpicName') : epic.name }),
+    closeLabel: t('panel.closeDetails'),
     onClose,
     onBack,
     body: el('div', { class: 'epic-detail-body' }, [

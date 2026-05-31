@@ -1,7 +1,9 @@
 import { el } from '../dom.js';
 import { shortSprintName } from '../format.js';
+import { t } from '../../app/i18n.js';
 
 const STATE_ORDER = { active: 0, future: 1, closed: 2 };
+const STATE_LABEL_KEY = { all: 'sprintFilter.all', active: 'sprintFilter.active', future: 'sprintFilter.future', closed: 'sprintFilter.closed' };
 
 // Scroll the horizontal sprint list so the given tab sits in the centre.
 function centerTab(sprintList, btn) {
@@ -70,7 +72,7 @@ export function renderSprintFilter({ sprints, activeId, onChange }) {
           renderSprintList(state);
         },
       }, [
-        state.charAt(0).toUpperCase() + state.slice(1),
+        t(STATE_LABEL_KEY[state]),
         el('span', { class: 'count' }, [String(counts[state])]),
       ]);
       stateButtons.appendChild(btn);
@@ -92,8 +94,8 @@ export function renderSprintFilter({ sprints, activeId, onChange }) {
   return el('div', { class: 'sprint-filter-container' }, [
     el('div', { class: 'filter-header' }, [
       el('div', {}, [
-        el('div', { class: 'filter-label' }, ['Filter']),
-        el('div', { class: 'filter-title' }, ['Choose a sprint']),
+        el('div', { class: 'filter-label' }, [t('sprintFilter.label')]),
+        el('div', { class: 'filter-title' }, [t('sprintFilter.title')]),
       ]),
       stateButtons,
     ]),

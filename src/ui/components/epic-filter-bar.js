@@ -1,11 +1,12 @@
 import { el } from '../dom.js';
 import { shortSprintName } from '../format.js';
+import { t } from '../../app/i18n.js';
 
 const STATUS_OPTIONS = [
-  { value: 'all',        label: 'All' },
-  { value: 'inprogress', label: 'In Progress' },
-  { value: 'todo',       label: 'To Do' },
-  { value: 'done',       label: 'Done' },
+  { value: 'all',        labelKey: 'epicFilter.all' },
+  { value: 'inprogress', labelKey: 'epicFilter.inprogress' },
+  { value: 'todo',       labelKey: 'epicFilter.todo' },
+  { value: 'done',       labelKey: 'epicFilter.done' },
 ];
 
 function statusButtons(value, onChange) {
@@ -14,7 +15,7 @@ function statusButtons(value, onChange) {
       class: `roadmap-filter-chip ${value === opt.value ? 'active' : ''}`,
       type: 'button',
       onClick: () => onChange(opt.value),
-    }, [opt.label])
+    }, [t(opt.labelKey)])
   );
 }
 
@@ -26,7 +27,7 @@ export function renderEpicFilterBar({
     class: 'roadmap-filter-select',
     onChange: (e) => onSprintChange(e.target.value),
   }, [
-    el('option', { value: 'all' }, ['All sprints']),
+    el('option', { value: 'all' }, [t('epicFilter.allSprints')]),
     ...sprints.map((sp) =>
       el('option', { value: sp.id, ...(filters.sprintId === sp.id ? { selected: 'selected' } : {}) },
         [shortSprintName(sp.name)])
@@ -37,7 +38,7 @@ export function renderEpicFilterBar({
   const searchInput = el('input', {
     type: 'search',
     class: 'roadmap-filter-search',
-    placeholder: 'Search epic key or name…',
+    placeholder: t('epicFilter.search'),
     value: filters.search || '',
     onInput: (e) => onSearchInput(e.target.value),
   });
@@ -58,11 +59,11 @@ export function renderEpicFilterBar({
 
   return el('div', { class: 'card roadmap-filter-bar' }, [
     el('div', { class: 'roadmap-filter-group' }, [
-      el('span', { class: 'roadmap-filter-label' }, ['Status']),
+      el('span', { class: 'roadmap-filter-label' }, [t('epicFilter.statusLabel')]),
       el('div', { class: 'roadmap-filter-chips' }, statusButtons(filters.status, onStatusChange)),
     ]),
     el('div', { class: 'roadmap-filter-group' }, [
-      el('span', { class: 'roadmap-filter-label' }, ['Sprint']),
+      el('span', { class: 'roadmap-filter-label' }, [t('epicFilter.sprintLabel')]),
       sprintSelect,
     ]),
     el('div', { class: 'roadmap-filter-group roadmap-filter-search-wrap' }, [
@@ -70,12 +71,12 @@ export function renderEpicFilterBar({
     ]),
     el('div', { class: 'roadmap-filter-meta' }, [
       el('span', { class: 'roadmap-filter-count' }, [
-        `${visibleEpics}/${totalEpics} epic${totalEpics !== 1 ? 's' : ''}`,
+        t('epicFilter.count', { visible: visibleEpics, total: totalEpics, count: totalEpics }),
       ]),
       hasFilter
         ? el('button', {
             class: 'roadmap-filter-clear', type: 'button', onClick: onClearAll,
-          }, ['Clear'])
+          }, [t('epicFilter.clear')])
         : null,
     ]),
   ]);

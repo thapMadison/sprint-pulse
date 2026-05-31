@@ -1,5 +1,6 @@
 import { svg } from './svg.js';
 import { el } from '../ui/dom.js';
+import { t } from '../app/i18n.js';
 
 function polarToCartesian(cx, cy, r, angleDeg) {
   const rad = (angleDeg - 90) * Math.PI / 180;
@@ -19,7 +20,7 @@ const COLORS = {
   inprogress: 'var(--amber)',
   todo: 'oklch(0.45 0.02 270)',
 };
-const LABELS = { done: 'Done', inprogress: 'In Progress', todo: 'To Do' };
+const LABELS = { done: 'chart.donut.done', inprogress: 'chart.donut.inprogress', todo: 'chart.donut.todo' };
 
 export function renderDonut({ counts, hoursByStatus, totalIssues }) {
   const size = 200, stroke = 22, r = (size - stroke) / 2;
@@ -74,7 +75,7 @@ export function renderDonut({ counts, hoursByStatus, totalIssues }) {
     x: cx, y: cy + 16, 'text-anchor': 'middle',
     fill: 'var(--ink-3)',
     style: 'font: 500 10px var(--font-mono); letter-spacing: 0.1em',
-  }, ['ISSUES']);
+  }, [t('chart.donut.issues')]);
 
   const svgEl = svg('svg',
     { width: size, height: size, viewBox: `0 0 ${size} ${size}` },
@@ -85,7 +86,7 @@ export function renderDonut({ counts, hoursByStatus, totalIssues }) {
     el('div', { class: 'donut-legend-row' }, [
       el('div', { class: 'left' }, [
         el('span', { class: 'sw', style: { background: COLORS[k] } }),
-        el('span', {}, [LABELS[k]]),
+        el('span', {}, [t(LABELS[k])]),
       ]),
       el('div', { class: 'right' }, [
         el('span', { class: 'big' }, [String(counts[k])]),

@@ -1,4 +1,5 @@
 import { el } from '../dom.js';
+import { t } from '../../app/i18n.js';
 
 // Shared scaffolding for the slide-in detail panels (task + epic). Builds the
 // backdrop, optional back button, close button, the dialog <aside>, and the
@@ -9,7 +10,7 @@ export function renderPanelShell({ panelClass, ariaLabel, closeLabel, onClose, o
   const backdrop = el('div', { class: 'epic-detail-backdrop', onClick: onClose });
 
   const backBtn = onBack
-    ? el('button', { class: 'panel-back-btn', type: 'button', 'aria-label': 'Go back', onClick: onBack }, ['←'])
+    ? el('button', { class: 'panel-back-btn', type: 'button', 'aria-label': t('common.goBack'), onClick: onBack }, ['←'])
     : null;
 
   const closeBtn = el('button', {

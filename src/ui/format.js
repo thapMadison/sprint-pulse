@@ -1,10 +1,12 @@
 // Small formatting helpers shared across UI components.
 
-const STATUS_LABEL = { inprogress: 'In Prog', todo: 'To Do', done: 'Done' };
+import { t } from '../app/i18n.js';
+
+const STATUS_KEY = { inprogress: 'status.inprogress', todo: 'status.todo', done: 'status.done' };
 
 // Short status label for an issue/task chip, preferring the raw Jira status name.
 export function statusLabel(issue) {
-  return issue.statusName || STATUS_LABEL[issue.status] || 'Done';
+  return issue.statusName || (STATUS_KEY[issue.status] ? t(STATUS_KEY[issue.status]) : t('status.done'));
 }
 
 // Drop a sprint name's descriptive suffix:
@@ -56,10 +58,8 @@ export function initials(name) {
 export function timeAgo(date, now = Date.now()) {
   if (!date) return '';
   const mins = Math.floor((now - date.getTime()) / 60000);
-  if (mins < 1) return 'just now';
-  if (mins === 1) return '1 min ago';
-  if (mins < 60) return `${mins} mins ago`;
+  if (mins < 1) return t('time.justNow');
+  if (mins < 60) return t('time.minAgo', { count: mins });
   const hours = Math.floor(mins / 60);
-  if (hours === 1) return '1 hour ago';
-  return `${hours} hours ago`;
+  return t('time.hourAgo', { count: hours });
 }

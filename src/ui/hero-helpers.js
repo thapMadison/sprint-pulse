@@ -1,18 +1,20 @@
 import { el } from './dom.js';
+import { t, getActiveLang } from '../app/i18n.js';
 
 // Small presentation helpers shared by the Sprint and Epic hero cards.
 
 // "05 May" — null-safe so it works for epics that may have no start/end yet.
+// The month label is localized via the shared month.* keys (same as the roadmap axis).
 export function fmtDate(d) {
   if (!d) return '—';
   const dt = new Date(d + 'T00:00:00');
-  return `${String(dt.getDate()).padStart(2, '0')} ${dt.toLocaleString('en', { month: 'short' })}`;
+  return `${String(dt.getDate()).padStart(2, '0')} ${t(`month.${dt.getMonth()}`)}`;
 }
 
-// "Mon" — the day-of-week label under a date.
+// "Mon" — the day-of-week label under a date, in the active language.
 export function fmtDow(d) {
   if (!d) return '';
-  return new Date(d + 'T00:00:00').toLocaleString('en', { weekday: 'short' });
+  return new Date(d + 'T00:00:00').toLocaleString(getActiveLang(), { weekday: 'short' });
 }
 
 // A label / value / sub-label cell in the hero meta row.
@@ -28,5 +30,5 @@ export function metaItem(label, value, sub, valueStyle) {
 export function dayUnit() {
   return el('span', {
     style: { fontSize: '13px', color: 'var(--ink-3)', marginLeft: '4px' },
-  }, ['d']);
+  }, [t('hero.dayUnit')]);
 }

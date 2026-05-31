@@ -86,7 +86,7 @@ describe('UI components (golden master DOM)', () => {
 
   it('renderProgressOverlay (api flow, mid-fetch)', () => {
     const node = renderProgressOverlay({
-      progress: { step: 'fetch', label: 'Pulling sprint data…', percent: 55, flow: 'api' },
+      progress: { step: 'fetch', labelKey: 'action.pullingSprintData', percent: 55, flow: 'api' },
     });
     expect(node.outerHTML).toMatchSnapshot();
   });

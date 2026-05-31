@@ -3,12 +3,13 @@ import { statusLabel, shortSprintName, fmtDateShort } from '../format.js';
 import { issueTypeIcon } from './issue-type-icon.js';
 import { renderUserCell } from './user-cell.js';
 import { STATUS_ORDER } from '../../app/constants.js';
+import { t } from '../../app/i18n.js';
 
 export function renderEpicTasksTable({ epic, jiraUrl, onOpenTask }) {
   if (!epic || !epic.tasks.length) {
     return el('div', { class: 'card' }, [
-      el('h3', { class: 'card-title' }, [el('span', {}, ['Tasks'])]),
-      el('p', { style: { color: 'var(--ink-3)', padding: '12px 0' } }, ['No tasks under this epic.']),
+      el('h3', { class: 'card-title' }, [el('span', {}, [t('epicTasks.titleShort')])]),
+      el('p', { style: { color: 'var(--ink-3)', padding: '12px 0' } }, [t('epicTasks.empty')]),
     ]);
   }
 
@@ -21,48 +22,48 @@ export function renderEpicTasksTable({ epic, jiraUrl, onOpenTask }) {
     return a.key.localeCompare(b.key);
   });
 
-  const rows = tasks.map((t) => {
-    const assignee = t.assignee || { color: 'var(--ink-3)', initials: '?', name: 'Unassigned' };
+  const rows = tasks.map((task) => {
+    const assignee = task.assignee || { color: 'var(--ink-3)', initials: '?', name: t('task.unassigned') };
     const keyNode = jiraUrl
-      ? el('a', { href: `${jiraUrl}/browse/${t.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'mono-key jira-key-link', onClick: (e) => e.stopPropagation() }, [t.key])
-      : el('span', { class: 'mono-key' }, [t.key]);
-    const trAttrs = onOpenTask ? { class: 'epic-task-clickable', onClick: () => onOpenTask(t) } : {};
+      ? el('a', { href: `${jiraUrl}/browse/${task.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'mono-key jira-key-link', onClick: (e) => e.stopPropagation() }, [task.key])
+      : el('span', { class: 'mono-key' }, [task.key]);
+    const trAttrs = onOpenTask ? { class: 'epic-task-clickable', onClick: () => onOpenTask(task) } : {};
     return el('tr', trAttrs, [
     el('td', {}, [el('span', { class: 'issue-key-cell' }, [
-      issueTypeIcon(t.type, { size: 16 }),
+      issueTypeIcon(task.type, { size: 16 }),
       keyNode,
     ])]),
-    el('td', { class: 'epic-task-summary' }, [t.summary]),
+    el('td', { class: 'epic-task-summary' }, [task.summary]),
     el('td', {}, [el('span', { class: 'sprint-chip' }, [
-      shortSprintName(t.sprintName) || '—',
+      shortSprintName(task.sprintName) || '—',
     ])]),
     el('td', {}, [renderUserCell(assignee)]),
     el('td', {}, [
-      el('span', { class: `status-chip ${t.status}` }, [
+      el('span', { class: `status-chip ${task.status}` }, [
         el('span', { class: 'sdot' }),
-        statusLabel(t),
+        statusLabel(task),
       ]),
     ]),
-    el('td', { class: 'mono-cell' }, [fmtDateShort(t.startedDate)]),
-    el('td', { class: 'mono-cell' }, [fmtDateShort(t.doneDate)]),
+    el('td', { class: 'mono-cell' }, [fmtDateShort(task.startedDate)]),
+    el('td', { class: 'mono-cell' }, [fmtDateShort(task.doneDate)]),
     ]);
   });
 
   return el('div', { class: 'card' }, [
     el('h3', { class: 'card-title' }, [
-      el('span', {}, ['Tasks in this Epic']),
-      el('span', { class: 'card-subtitle' }, [`${tasks.length} task${tasks.length !== 1 ? 's' : ''}`]),
+      el('span', {}, [t('epicTasks.title')]),
+      el('span', { class: 'card-subtitle' }, [t('epicTasks.count', { count: tasks.length })]),
     ]),
     el('table', { class: 'workload-table epic-tasks-table' }, [
       el('thead', {}, [
         el('tr', {}, [
-          el('th', { style: { width: '90px' } }, ['Key']),
-          el('th', {}, ['Summary']),
-          el('th', { style: { width: '120px' } }, ['Sprint']),
-          el('th', { style: { width: '180px' } }, ['Assignee']),
-          el('th', { style: { width: '100px' } }, ['Status']),
-          el('th', { style: { width: '70px' } }, ['Started']),
-          el('th', { style: { width: '70px' } }, ['Done']),
+          el('th', { style: { width: '90px' } }, [t('epicTasks.colKey')]),
+          el('th', {}, [t('epicTasks.colSummary')]),
+          el('th', { style: { width: '120px' } }, [t('epicTasks.colSprint')]),
+          el('th', { style: { width: '180px' } }, [t('epicTasks.colAssignee')]),
+          el('th', { style: { width: '100px' } }, [t('epicTasks.colStatus')]),
+          el('th', { style: { width: '70px' } }, [t('epicTasks.colStarted')]),
+          el('th', { style: { width: '70px' } }, [t('epicTasks.colDone')]),
         ]),
       ]),
       el('tbody', {}, rows),

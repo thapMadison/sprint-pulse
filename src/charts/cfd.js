@@ -1,6 +1,7 @@
 import { svg, shortDate } from './svg.js';
 import { el } from '../ui/dom.js';
 import { chartGeometry, buildXs } from '../ui/chart-helpers.js';
+import { t } from '../app/i18n.js';
 
 export function renderCFD(series) {
   const geom = chartGeometry({ H: 260 });
@@ -63,15 +64,15 @@ export function renderCFD(series) {
     el('div', { class: 'legend' }, [
       el('span', { class: 'legend-item' }, [
         el('span', { class: 'legend-sw', style: { background: 'var(--lime)', height: '8px' } }),
-        'Done',
+        t('chart.cfd.done'),
       ]),
       el('span', { class: 'legend-item' }, [
         el('span', { class: 'legend-sw', style: { background: 'var(--amber)', height: '8px' } }),
-        'In progress',
+        t('chart.cfd.inprogress'),
       ]),
       el('span', { class: 'legend-item' }, [
         el('span', { class: 'legend-sw', style: { background: 'oklch(0.5 0.02 270)', height: '8px' } }),
-        'To do',
+        t('chart.cfd.todo'),
       ]),
     ]),
   ]);

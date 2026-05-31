@@ -1,5 +1,6 @@
 import { el } from '../dom.js';
 import { svg } from '../../charts/svg.js';
+import { t } from '../../app/i18n.js';
 
 // Brand violet→cyan gradient, referenced by the active tab via CSS (stroke: url(#id)).
 function brandGradient(id) {
@@ -55,7 +56,7 @@ export function renderTabBtn({ key, label, icon, active, onChange }) {
 
 export function renderViewTabs({ active, onChange }) {
   return el('div', { class: 'view-tabs' }, [
-    renderTabBtn({ key: 'sprint', label: 'Sprint', icon: iconSprint(), active, onChange }),
-    renderTabBtn({ key: 'epic', label: 'Epic', icon: iconEpic(), active, onChange }),
+    renderTabBtn({ key: 'sprint', label: t('viewTabs.sprint'), icon: iconSprint(), active, onChange }),
+    renderTabBtn({ key: 'epic', label: t('viewTabs.epic'), icon: iconEpic(), active, onChange }),
   ]);
 }

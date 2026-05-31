@@ -2,6 +2,7 @@ import { el } from '../dom.js';
 import { svg } from '../../charts/svg.js';
 import { statusLabel } from '../format.js';
 import { issueTypeIcon } from './issue-type-icon.js';
+import { t } from '../../app/i18n.js';
 
 function renderIssueRow(iss, onOpen, jiraUrl) {
   const keyNode = jiraUrl
@@ -40,12 +41,12 @@ function renderIssueListHeader() {
     class: 'issue-row',
     style: { borderBottom: '1px solid var(--border)', paddingBottom: '8px', marginBottom: '4px' },
   }, [
-    el('span', { class: 'key', style: { color: 'var(--ink-3)' } }, ['KEY']),
-    el('span', { class: 'summary', style: hdrStyle }, ['Summary']),
-    el('span', { style: hdrStyle }, ['Status']),
-    el('span', { class: 'num-col', style: hdrStyle }, ['Est.']),
-    el('span', { class: 'num-col', style: hdrStyle }, ['Spent']),
-    el('span', { class: 'num-col', style: hdrStyle }, ['Remain']),
+    el('span', { class: 'key', style: { color: 'var(--ink-3)' } }, [t('workload.colKey')]),
+    el('span', { class: 'summary', style: hdrStyle }, [t('workload.colSummary')]),
+    el('span', { style: hdrStyle }, [t('workload.colStatus')]),
+    el('span', { class: 'num-col', style: hdrStyle }, [t('workload.colEst')]),
+    el('span', { class: 'num-col', style: hdrStyle }, [t('workload.colSpent')]),
+    el('span', { class: 'num-col', style: hdrStyle }, [t('workload.colRemain')]),
   ]);
 }
 
@@ -150,8 +151,8 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
               el('div', { class: 'name' }, [row.user.name]),
               el('div', { class: 'sub' }, [
                 searching
-                  ? `${matchingIssues.length} of ${totalCt} match`
-                  : `${totalCt} issue${totalCt !== 1 ? 's' : ''}`,
+                  ? t('workload.matchCount', { matching: matchingIssues.length, total: totalCt })
+                  : t('workload.issueCount', { count: totalCt }),
               ]),
             ]),
           ]),
@@ -195,7 +196,7 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
     if (query && tbody.children.length === 0) {
       tbody.appendChild(el('tr', {}, [
         el('td', { colSpan: 6, style: { textAlign: 'center', color: 'var(--ink-3)', padding: '24px' } }, [
-          `No tasks match "${query}".`,
+          t('workload.noMatch', { query }),
         ]),
       ]));
     }
@@ -205,7 +206,7 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
   const searchInput = el('input', {
     class: 'workload-search-input',
     type: 'text',
-    placeholder: 'Search tasks by key or summary…',
+    placeholder: t('workload.search'),
   });
   searchInput.addEventListener('input', () => {
     query = searchInput.value.trim().toLowerCase();
@@ -215,18 +216,18 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
 
   return el('div', { class: 'card' }, [
     el('h3', { class: 'card-title' }, [
-      el('span', {}, ['User Workload Report']),
-      el('span', { class: 'card-subtitle' }, [`${allRows.length} contributors · click a task for details`]),
+      el('span', {}, [t('workload.title')]),
+      el('span', { class: 'card-subtitle' }, [t('workload.subtitle', { count: allRows.length })]),
     ]),
     searchBox,
     el('table', { class: 'workload-table' }, [
       el('thead', {}, [
         el('tr', {}, [
-          el('th', { style: { width: '240px' } }, ['Assignee']),
-          el('th', {}, ['Status distribution']),
-          el('th', { style: { textAlign: 'right' } }, ['Estimate']),
-          el('th', { style: { textAlign: 'right' } }, ['Spent']),
-          el('th', { style: { textAlign: 'right' } }, ['Remaining']),
+          el('th', { style: { width: '240px' } }, [t('workload.thAssignee')]),
+          el('th', {}, [t('workload.thStatusDist')]),
+          el('th', { style: { textAlign: 'right' } }, [t('workload.thEstimate')]),
+          el('th', { style: { textAlign: 'right' } }, [t('workload.thSpent')]),
+          el('th', { style: { textAlign: 'right' } }, [t('workload.thRemaining')]),
           el('th', { style: { width: '24px' } }, []),
         ]),
       ]),

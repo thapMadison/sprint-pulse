@@ -1,16 +1,17 @@
 import { el } from '../dom.js';
+import { t } from '../../app/i18n.js';
 
 const API_STEPS = [
-  { key: 'connect', label: 'Connect' },
-  { key: 'fetch',   label: 'Pull data' },
-  { key: 'process', label: 'Convert' },
-  { key: 'done',    label: 'Done' },
+  { key: 'connect', labelKey: 'progress.connect' },
+  { key: 'fetch',   labelKey: 'progress.pullData' },
+  { key: 'process', labelKey: 'progress.convert' },
+  { key: 'done',    labelKey: 'progress.done' },
 ];
 
 const FILE_STEPS = [
-  { key: 'parse',   label: 'Read file' },
-  { key: 'process', label: 'Convert' },
-  { key: 'done',    label: 'Done' },
+  { key: 'parse',   labelKey: 'progress.readFile' },
+  { key: 'process', labelKey: 'progress.convert' },
+  { key: 'done',    labelKey: 'progress.done' },
 ];
 
 function stepsFor(progress) {
@@ -33,7 +34,7 @@ export function renderProgressOverlay({ progress }) {
   const stepNodes = steps.map((s, i) =>
     el('div', { class: stepClass(steps, activeIdx, i, progress) }, [
       el('span', { class: 'progress-dot' }, []),
-      el('span', { class: 'progress-step-label' }, [s.label]),
+      el('span', { class: 'progress-step-label' }, [t(s.labelKey)]),
     ])
   );
 
@@ -42,7 +43,7 @@ export function renderProgressOverlay({ progress }) {
   return el('div', { class: 'progress-strip', id: 'progress-strip', 'data-flow': progress.flow || 'api' }, [
     el('div', { class: 'progress-strip-head' }, [
       el('span', { class: 'progress-spinner' }, []),
-      el('span', { class: 'progress-label' }, [progress.label]),
+      el('span', { class: 'progress-label' }, [t(progress.labelKey)]),
       el('span', { class: 'progress-percent' }, [`${progress.percent}%`]),
     ]),
     el('div', { class: 'progress-bar-track' }, [
@@ -76,7 +77,7 @@ export function updateProgressOverlay(progress) {
     const label = strip.querySelector('.progress-label');
     const percent = strip.querySelector('.progress-percent');
     const fill = strip.querySelector('.progress-bar-fill');
-    if (label) label.textContent = progress.label;
+    if (label) label.textContent = t(progress.labelKey);
     if (percent) percent.textContent = `${progress.percent}%`;
     if (fill) fill.style.width = `${progress.percent}%`;
 

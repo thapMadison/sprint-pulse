@@ -1,5 +1,6 @@
 import { svg } from '../../charts/svg.js';
 import { el } from '../dom.js';
+import { t } from '../../app/i18n.js';
 
 // Shared issue-type iconography, used consistently across the whole app
 // (workload table, epic tasks table, roadmap, task detail panel).
@@ -10,11 +11,11 @@ import { el } from '../dom.js';
 // without copying its exact assets.
 
 const TYPE_DEFS = {
-  epic:    { label: 'Epic',     color: '#8b5cf6' },
-  story:   { label: 'Story',    color: '#22c55e' },
-  task:    { label: 'Task',     color: '#3b82f6' },
-  bug:     { label: 'Bug',      color: '#ef4444' },
-  subtask: { label: 'Sub-task', color: '#06b6d4' },
+  epic:    { labelKey: 'issueType.epic',    color: '#8b5cf6' },
+  story:   { labelKey: 'issueType.story',   color: '#22c55e' },
+  task:    { labelKey: 'issueType.task',    color: '#3b82f6' },
+  bug:     { labelKey: 'issueType.bug',     color: '#ef4444' },
+  subtask: { labelKey: 'issueType.subtask', color: '#06b6d4' },
 };
 
 // Map a raw Jira issuetype name to one of our known keys.
@@ -29,7 +30,8 @@ export function normalizeIssueType(raw) {
 }
 
 export function issueTypeLabel(raw) {
-  return TYPE_DEFS[normalizeIssueType(raw)]?.label || (raw || 'Task');
+  const def = TYPE_DEFS[normalizeIssueType(raw)];
+  return def ? t(def.labelKey) : (raw || t('issueType.task'));
 }
 
 export function issueTypeColor(raw) {
@@ -80,7 +82,7 @@ export function issueTypeIcon(rawType, { size = 18, withTitle = true } = {}) {
       width: `${size}px`,
       height: `${size}px`,
     },
-    ...(withTitle ? { title: def.label } : {}),
+    ...(withTitle ? { title: t(def.labelKey) } : {}),
   }, [glyph(typeKey)]);
 }
 

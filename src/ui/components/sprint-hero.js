@@ -2,10 +2,11 @@ import { el } from '../dom.js';
 import { svg } from '../../charts/svg.js';
 import { workingDaysBetween, workingDaysRemaining } from '../../domain/working-days.js';
 import { fmtDate, fmtDow, metaItem, dayUnit } from '../hero-helpers.js';
+import { t } from '../../app/i18n.js';
 
 function renderGoalPopover(goalText) {
   const popover = el('div', { class: 'goal-popover' }, [
-    el('div', { class: 'goal-popover-label' }, ['Sprint Goal']),
+    el('div', { class: 'goal-popover-label' }, [t('hero.sprintGoal')]),
     el('div', { class: 'goal-popover-text' }, [goalText || '—']),
   ]);
   const iconSvg = svg('svg', {
@@ -17,7 +18,7 @@ function renderGoalPopover(goalText) {
     svg('line', { x1: 12, y1: 16, x2: 12, y2: 12 }),
     svg('line', { x1: 12, y1: 8, x2: 12.01, y2: 8 }),
   ]);
-  const btn = el('button', { class: 'goal-info-btn', type: 'button' }, ['Goal']);
+  const btn = el('button', { class: 'goal-info-btn', type: 'button' }, [t('hero.goal')]);
   btn.insertBefore(iconSvg, btn.firstChild);
   popover.addEventListener('click', (e) => e.stopPropagation());
   btn.onclick = (e) => {
@@ -81,25 +82,25 @@ export function renderSprintHero({ sprint, today }) {
         renderGoalPopover(sprint.goal),
       ]),
       el('div', { class: 'sprint-meta' }, [
-        metaItem('Start', [fmtDate(sprint.startDate)], fmtDow(sprint.startDate)),
-        metaItem('End', [fmtDate(sprint.endDate)], fmtDow(sprint.endDate)),
-        metaItem('Duration', [String(duration), dayUnit()], 'working days'),
-        metaItem('Remaining', [String(remaining), dayUnit()], 'working days', { color: remainingColor }),
+        metaItem(t('hero.start'), [fmtDate(sprint.startDate)], fmtDow(sprint.startDate)),
+        metaItem(t('hero.end'), [fmtDate(sprint.endDate)], fmtDow(sprint.endDate)),
+        metaItem(t('hero.duration'), [String(duration), dayUnit()], t('hero.workingDays')),
+        metaItem(t('hero.remaining'), [String(remaining), dayUnit()], t('hero.workingDays'), { color: remainingColor }),
       ]),
     ]),
     el('div', { class: 'stat-grid' }, [
       statTile({
-        label: 'Original Estimate', hours: totalEst, totalEst: null,
+        label: t('hero.originalEstimate'), hours: totalEst, totalEst: null,
         accentBg: 'linear-gradient(90deg, var(--violet), var(--cyan))',
       }),
       el('div', { class: 'card stat-tile' }, [
-        el('div', { class: 'stat-label' }, ['Time Spent']),
+        el('div', { class: 'stat-label' }, [t('hero.timeSpent')]),
         el('div', {}, [
           el('div', { class: 'stat-value-row' }, [
             el('div', { class: 'stat-value' }, [
               totalSpent.toFixed(0), el('span', { class: 'unit' }, ['h']),
             ]),
-            el('span', { class: 'stat-pct' }, [`${spentPct.toFixed(0)}% of estimate`]),
+            el('span', { class: 'stat-pct' }, [t('hero.pctOfEstimate', { pct: spentPct.toFixed(0) })]),
           ]),
           el('div', { class: 'stat-bar' }, [
             el('span', {
@@ -113,7 +114,7 @@ export function renderSprintHero({ sprint, today }) {
         ]),
       ]),
       statTile({
-        label: 'Remaining Effort', hours: totalRemain, totalEst,
+        label: t('hero.remainingEffort'), hours: totalRemain, totalEst,
         accentBg: 'linear-gradient(90deg, var(--coral), var(--amber))',
       }),
     ]),

@@ -5,6 +5,7 @@ import { issueTypeIcon, issueTypeBadge } from './issue-type-icon.js';
 import { renderUserCell } from './user-cell.js';
 import { renderPanelShell } from './panel-shell.js';
 import { fetchTaskDetail } from '../../app/actions.js';
+import { t } from '../../app/i18n.js';
 
 // One labelled meta field (label above value). Returns { field, valueEl } so
 // callers can replace the skeleton with real data without touching the layout.
@@ -75,24 +76,24 @@ function effortTiles(iss) {
 
   return el('div', { class: 'task-effort-grid' }, [
     el('div', { class: 'card stat-tile' }, [
-      el('div', { class: 'stat-label' }, ['Original Estimate']),
+      el('div', { class: 'stat-label' }, [t('hero.originalEstimate')]),
       el('div', {}, [
         el('div', { class: 'stat-value' }, [totalEst.toFixed(1), el('span', { class: 'unit' }, ['h'])]),
         statBar('linear-gradient(90deg, var(--violet), var(--cyan))', 1),
       ]),
     ]),
     el('div', { class: 'card stat-tile' }, [
-      el('div', { class: 'stat-label' }, ['Time Spent']),
+      el('div', { class: 'stat-label' }, [t('hero.timeSpent')]),
       el('div', {}, [
         el('div', { class: 'stat-value-row' }, [
           el('div', { class: 'stat-value' }, [spent.toFixed(1), el('span', { class: 'unit' }, ['h'])]),
-          el('span', { class: 'stat-pct' }, [`${(spentPct * 100).toFixed(0)}% of est.`]),
+          el('span', { class: 'stat-pct' }, [t('task.pctOfEst', { pct: (spentPct * 100).toFixed(0) })]),
         ]),
         statBar('linear-gradient(90deg, var(--lime), var(--cyan))', spentPct),
       ]),
     ]),
     el('div', { class: 'card stat-tile' }, [
-      el('div', { class: 'stat-label' }, ['Remaining Effort']),
+      el('div', { class: 'stat-label' }, [t('hero.remainingEffort')]),
       el('div', {}, [
         el('div', { class: 'stat-value' }, [remaining.toFixed(1), el('span', { class: 'unit' }, ['h'])]),
         statBar('linear-gradient(90deg, var(--coral), var(--amber))', remainPct),
@@ -105,7 +106,7 @@ function effortTiles(iss) {
 function statusTimeline(iss) {
   const changes = iss.statusChanges || [];
   if (!changes.length) {
-    return el('p', { class: 'task-detail-empty' }, ['No status history available.']);
+    return el('p', { class: 'task-detail-empty' }, [t('task.noStatusHistory')]);
   }
 
   return el('div', { class: 'task-timeline' },
@@ -154,7 +155,7 @@ function commentList(comments) {
           class: 'avatar-mini',
           style: { background: 'var(--violet)' },
         }, [initials(c.authorName)]),
-        el('span', { class: 'task-comment-author' }, [c.authorName || 'Unknown']),
+        el('span', { class: 'task-comment-author' }, [c.authorName || t('common.unknown')]),
         el('span', { class: 'task-comment-date' }, [fmtDateTime(c.created)]),
       ]),
       textBlock(c.body || ''),
@@ -172,7 +173,7 @@ function loadingLine(text) {
 export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onBack }) {
   if (!issue) return null;
 
-  const assignee = issue.assignee || { color: 'var(--ink-3)', initials: '?', name: 'Unassigned' };
+  const assignee = issue.assignee || { color: 'var(--ink-3)', initials: '?', name: t('task.unassigned') };
 
   // ── Header ─────────────────────────────────────────────────────────────────
   const header = el('div', { class: 'task-detail-header' }, [
@@ -196,22 +197,22 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
   // until the lazy fetch resolves — no layout shift, just in-place substitution.
   const assigneeCell = renderUserCell(assignee);
 
-  const reporterSlot = metaField('Reporter', fieldSkeleton());
-  const createdSlot  = metaField('Created',  fieldSkeleton());
-  const updatedSlot  = metaField('Updated',  fieldSkeleton());
+  const reporterSlot = metaField(t('task.reporter'), fieldSkeleton());
+  const createdSlot  = metaField(t('task.created'),  fieldSkeleton());
+  const updatedSlot  = metaField(t('task.updated'),  fieldSkeleton());
   // Due and Labels are always visible; their values are filled by the lazy fetch.
-  const dueSlot    = metaField('Due',    fieldSkeleton());
-  const labelsSlot = metaField('Labels', fieldSkeleton(), { span3: true });
+  const dueSlot    = metaField(t('task.due'),    fieldSkeleton());
+  const labelsSlot = metaField(t('task.labels'), fieldSkeleton(), { span3: true });
 
   // Row 1: Type | Priority | Epic(span2, always shown)
   // Row 2: Assignee(newRow) | Reporter | Created | Updated
   // Row 3: Due | Labels(span3)
   const epicValue = (issue.epicKey || issue.epicName) ? epicBadge(issue, jiraUrl, onOpenEpic) : '—';
   const metaFields = [
-    metaField('Type',     issueTypeBadge(issue.type)),
-    metaField('Priority', el('span', { class: `task-priority ${(issue.priority || '').toLowerCase()}` }, [issue.priority || '—'])),
-    metaField('Epic',     epicValue, { span2: true }),
-    metaField('Assignee', assigneeCell, { newRow: true }),
+    metaField(t('task.type'),     issueTypeBadge(issue.type)),
+    metaField(t('task.priority'), el('span', { class: `task-priority ${(issue.priority || '').toLowerCase()}` }, [issue.priority || '—'])),
+    metaField(t('task.epic'),     epicValue, { span2: true }),
+    metaField(t('task.assignee'), assigneeCell, { newRow: true }),
     reporterSlot,
     createdSlot,
     updatedSlot,
@@ -224,35 +225,35 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
   const infoCard = el('div', { class: 'task-detail-info-card' }, [
     el('div', { class: 'task-detail-info-left' }, [
       el('div', { class: 'task-detail-section' }, [
-        el('h3', { class: 'task-detail-section-title' }, ['Details']),
+        el('h3', { class: 'task-detail-section-title' }, [t('task.details')]),
         metaGrid,
       ]),
     ]),
     el('div', { class: 'task-detail-info-right' }, [
       el('div', { class: 'task-detail-section' }, [
-        el('h3', { class: 'task-detail-section-title' }, ['Effort']),
+        el('h3', { class: 'task-detail-section-title' }, [t('task.effort')]),
         effortTiles(issue),
       ]),
     ]),
   ]);
 
   // ── Description (lazy, optional — removed when absent) ─────────────────────
-  const descBody = el('div', {}, [loadingLine('Loading description…')]);
+  const descBody = el('div', {}, [loadingLine(t('task.loadingDescription'))]);
   const descSection = el('div', { class: 'task-detail-section' }, [
-    el('h3', { class: 'task-detail-section-title' }, ['Description']),
+    el('h3', { class: 'task-detail-section-title' }, [t('task.description')]),
     descBody,
   ]);
 
   // ── Activity row: Comments (left) + History (right) ─────────────────────────
   // History comes from sprint data so it's always present without a lazy fetch.
   // Comments are lazily filled; the section header updates with the count.
-  const commentsTitleEl = el('h3', { class: 'task-detail-section-title' }, ['Comments']);
-  const commentsBody = el('div', {}, [loadingLine('Loading comments…')]);
+  const commentsTitleEl = el('h3', { class: 'task-detail-section-title' }, [t('task.comments')]);
+  const commentsBody = el('div', {}, [loadingLine(t('task.loadingComments'))]);
 
   const activitySection = el('div', { class: 'task-detail-activity' }, [
     el('div', { class: 'task-detail-comments-col' }, [commentsTitleEl, commentsBody]),
     el('div', { class: 'task-detail-history-col' }, [
-      el('h3', { class: 'task-detail-section-title' }, ['History']),
+      el('h3', { class: 'task-detail-section-title' }, [t('task.history')]),
       statusTimeline(issue),
     ]),
   ]);
@@ -267,8 +268,8 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
 
   const overlay = renderPanelShell({
     panelClass: 'epic-detail-panel task-detail-panel',
-    ariaLabel: `Details for ${issue.key}`,
-    closeLabel: 'Close task details',
+    ariaLabel: t('task.detailsForKey', { key: issue.key }),
+    closeLabel: t('task.closeDetails'),
     onClose,
     onBack,
     body,
@@ -289,7 +290,7 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
         labelsSlot.valueEl.replaceChildren('—');
         descSection.remove();
         commentsBody.replaceChildren(
-          el('p', { class: 'task-detail-empty' }, ['Comments not available for this source.'])
+          el('p', { class: 'task-detail-empty' }, [t('task.commentsNotAvailable')])
         );
         return;
       }
@@ -307,7 +308,7 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
 
       // Optional: Components (only appended when present).
       if (detail.components && detail.components.length) {
-        metaGrid.appendChild(metaField('Components', el('span', {}, [detail.components.join(', ')]), { wide: true }).field);
+        metaGrid.appendChild(metaField(t('task.components'), el('span', {}, [detail.components.join(', ')]), { wide: true }).field);
       }
 
       // Description.
@@ -319,11 +320,11 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
 
       // Comments.
       if (detail.comments && detail.comments.length) {
-        commentsTitleEl.textContent = `Comments (${detail.comments.length})`;
+        commentsTitleEl.textContent = t('task.commentsCount', { count: detail.comments.length });
         commentsBody.replaceChildren(commentList(detail.comments));
       } else {
         commentsBody.replaceChildren(
-          el('p', { class: 'task-detail-empty' }, ['No comments on this task.'])
+          el('p', { class: 'task-detail-empty' }, [t('task.noComments')])
         );
       }
     })
@@ -335,10 +336,10 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
       dueSlot.valueEl.replaceChildren('—');
       labelsSlot.valueEl.replaceChildren('—');
       descBody.replaceChildren(
-        el('p', { class: 'task-detail-empty' }, ['Could not load extended details.'])
+        el('p', { class: 'task-detail-empty' }, [t('task.couldNotLoadDetails')])
       );
       commentsBody.replaceChildren(
-        el('p', { class: 'task-detail-empty' }, ['Could not load comments.'])
+        el('p', { class: 'task-detail-empty' }, [t('task.couldNotLoadComments')])
       );
     });
 
