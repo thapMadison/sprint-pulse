@@ -3369,3 +3369,85 @@ html.theme-light {
   gap: 7px;
 }
 .epic-badge-btn:hover { opacity: 0.8; }
+
+/* ============================================================
+   Mobile responsive — 768px (tablet / large phone)
+   ============================================================ */
+@media (max-width: 768px) {
+  /* Data source bar */
+  .data-source-bar { gap: 8px; padding: 8px 10px; }
+  .data-source-bar .ds-trailing { flex-wrap: wrap; gap: 8px; }
+
+  /* Sprint filter */
+  .filter-header { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .filter-title { font-size: 16px; }
+  .state-filter { flex-wrap: wrap; gap: 4px; }
+  .state-btn { padding: 6px 10px; font-size: 11px; }
+
+  /* Task detail panel */
+  .task-detail-info-card { grid-template-columns: 1fr; }
+  .task-detail-info-left { padding-right: 0; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
+  .task-detail-info-right { border-left: none; padding-left: 0; padding-top: 16px; }
+  .task-detail-meta { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .task-detail-field--span3 { grid-column: span 2; }
+  .epic-detail-body { padding: 16px 16px 24px; }
+
+  /* Roadmap: narrow sticky-left column */
+  .roadmap-track-inner { grid-template-columns: 200px 1fr; }
+  .roadmap-bg-overlay,
+  .roadmap-today-layer { left: 200px; }
+
+  /* Epic list: allow single column on smaller tablets */
+  .epic-list-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+}
+
+/* ============================================================
+   Mobile responsive — 480px (phone)
+   ============================================================ */
+@media (max-width: 480px) {
+  /* Data source bar: stack trailing content */
+  .data-source-bar { padding: 6px 8px; gap: 6px; }
+  .data-source-bar .ds-btn { padding: 6px 10px; font-size: 11px; }
+  .data-source-bar .ds-trailing { margin-left: 0; width: 100%; }
+  .data-source-bar .ds-status { font-size: 10px; }
+
+  /* Hide the ds-divider as ds-trailing goes full-width */
+  .data-source-bar .ds-divider { display: none; }
+
+  /* State filter buttons: compact */
+  .state-btn { padding: 5px 8px; font-size: 11px; }
+  .state-btn .count { padding: 1px 5px; font-size: 9px; }
+
+  /* Topbar right: hide user name to save space */
+  .user-name { display: none; }
+
+  /* Topbar right: narrow user-pill */
+  .user-pill { padding: 6px 8px; }
+
+  /* Sprint filter */
+  .filter-title { font-size: 15px; }
+
+  /* Task detail panel */
+  .task-detail-title { font-size: 17px; }
+  .epic-detail-body { padding: 12px 12px 20px; }
+
+  /* Task meta: keep 2 columns, all span-3 become span-2 */
+  .task-detail-field--span3 { grid-column: span 2; }
+
+  /* Roadmap: narrower sticky column on phone */
+  .roadmap-track-inner { grid-template-columns: 160px 1fr; }
+  .roadmap-bg-overlay,
+  .roadmap-today-layer { left: 160px; }
+  .roadmap-row-left { padding: 6px 8px; }
+  .roadmap-name-btn { font-size: 11px; }
+
+  /* View tabs (Sprint / Epic switcher) */
+  .view-tab { padding: 7px 12px; font-size: 10px; gap: 5px; }
+
+  /* Epic list: single column */
+  .epic-list-grid { grid-template-columns: 1fr; }
+
+  /* Progress strip: hide step labels */
+  .progress-step-label { display: none; }
+  .progress-steps { gap: 8px; }
+}
