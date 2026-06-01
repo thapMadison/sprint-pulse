@@ -51,9 +51,9 @@ export function renderDonut({ counts, hoursByStatus, totalIssues }) {
     svg('filter', {
       id: 'donutSoftGlow', x: '-30%', y: '-30%', width: '160%', height: '160%',
     }, [
-      svg('feGaussianBlur', { stdDeviation: 4, result: 'blur' }),
+      svg('feGaussianBlur', { stdDeviation: 2.2, result: 'blur' }),
       svg('feComponentTransfer', { in: 'blur', result: 'softer' }, [
-        svg('feFuncA', { type: 'linear', slope: 0.55 }),
+        svg('feFuncA', { type: 'linear', slope: 0.4 }),
       ]),
       svg('feMerge', {}, [
         svg('feMergeNode', { in: 'softer' }),

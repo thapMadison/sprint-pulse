@@ -42,6 +42,12 @@ export default {
   // ── Language picker ────────────────────────────────────────────────────────────
   'lang.label': 'Language',
 
+  // ── Account menu + theme switch ───────────────────────────────────────────────
+  'menu.label': 'Settings & account',
+  'theme.label': 'Appearance',
+  'theme.light': 'Light',
+  'theme.dark': 'Dark',
+
   // ── Status labels (issue/task chips; keep short) ──────────────────────────────
   'status.inprogress': 'In Prog',
   'status.todo': 'To Do',

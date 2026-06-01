@@ -9,6 +9,13 @@ html.theme-light {
   --ink-3: oklch(0.55 0.015 270);
   --border: oklch(0.2 0.01 270 / 0.12);
   --card: oklch(1 0 0 / 0.82);
+  /* Original vivid accents — they read well on the pale background, so light
+     keeps them while :root carries the muted dark-tuned versions. */
+  --violet: oklch(0.72 0.18 295);
+  --cyan: oklch(0.82 0.13 200);
+  --lime: oklch(0.84 0.18 130);
+  --coral: oklch(0.72 0.18 25);
+  --amber: oklch(0.82 0.15 75);
 }
 
 /* === Additions for vanilla port: data-source picker, dialogs, banners === */
@@ -357,9 +364,11 @@ html.theme-light {
   gap: 6px;
   padding: 8px 14px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  color: #475569;
+  /* Dark-glass default (the bare :root theme), mirroring .scroll-btn / .ds-btn.
+     The .theme-light override below restores the light look. */
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--ink-2);
   font-family: var(--font-body);
   font-weight: 500;
   font-size: 12px;
@@ -369,9 +378,9 @@ html.theme-light {
 }
 
 .state-btn:hover {
-  color: #1e293b;
-  background: rgba(255, 255, 255, 0.8);
-  border-color: rgba(0, 0, 0, 0.2);
+  color: var(--ink);
+  background: var(--border-strong);
+  border-color: var(--border-strong);
 }
 
 .state-btn.selected {
@@ -425,9 +434,11 @@ html.theme-light {
 .theme-light .state-btn {
   background: rgba(0, 0, 0, 0.04);
   border-color: rgba(0, 0, 0, 0.1);
+  /* color: #475569; */
 }
 .theme-light .state-btn:hover {
   background: rgba(0, 0, 0, 0.08);
+  color: #1e293b;
 }
 .theme-light .state-btn.selected {
   border-color: transparent;
@@ -760,6 +771,334 @@ html.theme-light {
 }
 .theme-light .lang-option:hover {
   background: oklch(0 0 0 / 0.05);
+}
+
+/* ── Account-menu sections (theme switch + language live inside the dropdown) ── */
+.menu-section {
+  padding: 4px 2px;
+}
+.menu-section + .menu-section {
+  margin-top: 2px;
+}
+.menu-section-label {
+  font: 500 10px var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 4px 8px 3px; /* tightened bottom padding */
+}
+
+/* ── Day/Night toggle switch (ported from theme-switch-export) ───────────── */
+.theme-switch {
+  --sw-h:   36px;
+  --sw-pad:  6px;  /* gap between track border and knob */
+  --knob: calc(var(--sw-h) - var(--sw-pad) * 2);
+
+  position: relative;
+  width: 100%;    /* fills the section — matches lang-trigger width */
+  height: var(--sw-h);
+  display: block;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+}
+
+/* Track */
+.theme-switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 1px solid oklch(1 0 0 / 0.11);
+  overflow: hidden;
+  transition: background 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
+  /* Dark — violet-blue night sky */
+  background:
+    radial-gradient(130% 150% at 80% 20%, oklch(0.36 0.07 295 / 0.95), transparent 62%),
+    linear-gradient(140deg, oklch(0.30 0.06 285), oklch(0.22 0.05 290));
+  box-shadow:
+    inset 0 1px 2px oklch(0 0 0 / 0.5),
+    inset 0 0 0 1px oklch(1 0 0 / 0.03);
+}
+.theme-switch.is-light .theme-switch-track {
+  /* Light — soft cyan-blue daytime sky */
+  background:
+    radial-gradient(130% 150% at 80% 25%, oklch(0.93 0.08 95 / 0.6), transparent 60%),
+    linear-gradient(150deg, oklch(0.90 0.045 220), oklch(0.84 0.07 210));
+  border-color: oklch(0.60 0.05 230 / 0.30);
+  box-shadow: inset 0 1px 2px oklch(0.4 0.05 230 / 0.20);
+}
+
+/* Stars */
+.theme-switch-stars i {
+  position: absolute;
+  border-radius: 50%;
+  background: oklch(1 0 0 / 0.85);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.theme-switch-stars i:nth-child(1) { width: 2px;   height: 2px;   top:  9px; left: 60px; }
+.theme-switch-stars i:nth-child(2) { width: 3px;   height: 3px;   top: 20px; left: 82px; }
+.theme-switch-stars i:nth-child(3) { width: 2px;   height: 2px;   top: 25px; left: 52px; }
+.theme-switch-stars i:nth-child(4) { width: 1.5px; height: 1.5px; top: 12px; left: 97px; }
+.theme-switch.is-dark .theme-switch-stars i {
+  opacity: 1;
+  animation: tsw-twinkle 3s ease-in-out infinite;
+}
+.theme-switch.is-dark .theme-switch-stars i:nth-child(2) { animation-delay: -1s; }
+.theme-switch.is-dark .theme-switch-stars i:nth-child(3) { animation-delay: -2s; }
+@keyframes tsw-twinkle {
+  0%, 100% { opacity: 0.9; }
+  50%       { opacity: 0.3; }
+}
+
+/* Clouds */
+.theme-switch-clouds {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity 0.5s ease;
+}
+.theme-switch-clouds svg { width: 100%; height: 100%; display: block; }
+.theme-switch-clouds.night { opacity: 1; }
+.theme-switch-clouds.day   { opacity: 0; }
+.theme-switch.is-light .theme-switch-clouds.night { opacity: 0; }
+.theme-switch.is-light .theme-switch-clouds.day   { opacity: 1; }
+
+/* Knob */
+.theme-switch-knob {
+  position: absolute;
+  top: var(--sw-pad);
+  left: var(--sw-pad);
+  width: var(--knob);
+  height: var(--knob);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  /* Dark default: knob on the right — left:100% minus knob size and pad works
+     with any rendered width, so width:100% on the button is safe. */
+  left: calc(100% - var(--knob) - var(--sw-pad));
+  transition:
+    left       0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    width      0.15s ease,
+    background 0.5s ease,
+    box-shadow 0.5s ease;
+  /* Moon knob */
+  background: linear-gradient(150deg, oklch(0.40 0.02 264), oklch(0.30 0.02 264));
+  box-shadow:
+    0 2px 6px oklch(0 0 0 / 0.45),
+    inset 0  1px 1px oklch(1 0 0 / 0.18),
+    inset 0 -2px 3px oklch(0 0 0 / 0.30);
+}
+.theme-switch.is-light .theme-switch-knob {
+  /* Light: knob slides to the left */
+  left: var(--sw-pad);
+  background: radial-gradient(circle at 35% 30%, oklch(0.96 0.10 92), oklch(0.82 0.16 75));
+  box-shadow:
+    0 2px 8px  oklch(0.75 0.16 70 / 0.55),
+    0 0  14px  oklch(0.85 0.16 80 / 0.50),
+    inset 0 1px 1px oklch(1 0 0 / 0.60);
+}
+.theme-switch:active .theme-switch-knob {
+  width: calc(var(--knob) + 4px);
+}
+.theme-switch:focus-visible .theme-switch-track {
+  box-shadow: 0 0 0 3px oklch(0.68 0.15 290 / 0.40);
+}
+
+/* Sun/moon icons inside the knob — crossfade on toggle */
+.theme-switch-knob-sun,
+.theme-switch-knob-moon {
+  position: absolute;
+  inset: 0;       /* fill the full knob so flex-center is truly centered */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.35s ease, transform 0.45s ease;
+}
+.theme-switch-knob-sun {
+  color: oklch(0.32 0.10 60);
+  opacity: 0;
+  transform: scale(0.5) rotate(-90deg);
+}
+.theme-switch-knob-moon {
+  color: oklch(0.88 0.03 250);
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+.theme-switch.is-light .theme-switch-knob-sun  { opacity: 1; transform: scale(1) rotate(0deg); }
+.theme-switch.is-light .theme-switch-knob-moon { opacity: 0; transform: scale(0.5) rotate(90deg); }
+
+/* Built-in Light / Dark text labels inside the track — fade with the theme. */
+.tsw-lbl {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font: 600 11px var(--font-body);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+  z-index: 3; /* above clouds, below knob */
+  transition: opacity 0.4s ease, color 0.4s ease;
+}
+.tsw-lbl-light { left: 12px; }
+.tsw-lbl-dark  { right: 12px; }
+
+/* Dark mode: "Sáng" (left) = active/bright, "Tối" (right) = dim */
+.theme-switch.is-dark .tsw-lbl-light {
+  opacity: 1;
+  color: oklch(0.95 0.005 90);
+}
+.theme-switch.is-dark .tsw-lbl-dark {
+  opacity: 0.35;
+  color: oklch(0.80 0.005 220);
+}
+/* Light mode: "Tối" (right) = active/dark text, "Sáng" (left) = dim */
+.theme-switch.is-light .tsw-lbl-light {
+  opacity: 0.35;
+  color: oklch(0.28 0.03 270);
+}
+.theme-switch.is-light .tsw-lbl-dark {
+  opacity: 1;
+  color: oklch(0.28 0.04 270);
+}
+
+/* ── Language section: trigger + absolute overlay ────────────────────────────
+   The trigger is a full-width summary button (current flag + name + ▾).
+   Clicking opens .lang-overlay which is position:absolute inset-0 inside
+   .user-dropdown — it covers the main panel completely without resizing it. */
+
+/* Summary trigger button — same full-width style as theme-option rows */
+.lang-trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: oklch(1 0 0 / 0.04);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--ink-2);
+  font-family: var(--font-body);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+.lang-trigger:hover {
+  background: oklch(1 0 0 / 0.10);
+  color: var(--ink);
+  border-color: var(--border-strong);
+}
+.lang-trigger-label { flex: 1; }
+.lang-trigger-chevron {
+  font-size: 12px;
+  opacity: 0.5;
+  transition: transform 0.2s ease;
+}
+.user-dropdown.lang-open .lang-trigger-chevron {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+.theme-light .lang-trigger { background: oklch(0 0 0 / 0.03); }
+.theme-light .lang-trigger:hover { background: oklch(0 0 0 / 0.06); }
+
+/* Overlay covers .user-dropdown entirely — dropdown size never changes.
+   Must use an opaque background so the main content doesn't bleed through. */
+.lang-overlay {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-1); /* opaque — no alpha leak */
+  border-radius: 12px; /* match .user-dropdown */
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateX(8px);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+  z-index: 10;
+}
+.user-dropdown.lang-open .lang-overlay {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+}
+
+/* Header: back arrow + section title */
+.lang-overlay-header {
+  padding: 6px 6px 4px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.lang-back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 8px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--ink-2);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.lang-back:hover { background: oklch(1 0 0 / 0.08); color: var(--ink); }
+.lang-back-arrow {
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+/* Language list inside the overlay */
+.lang-overlay-list {
+  padding: 6px;
+  overflow-y: auto;
+}
+.lang-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--ink-2);
+  font-family: var(--font-body);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.lang-list-item:hover { background: oklch(1 0 0 / 0.08); color: var(--ink); }
+.lang-list-item .lang-option-label { flex: 1; }
+.lang-list-item .lang-check {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--cyan);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.lang-list-item.active { color: var(--ink); }
+.lang-list-item.active .lang-check { opacity: 1; transform: scale(1); }
+.theme-light .lang-list-item:hover { background: oklch(0 0 0 / 0.05); }
+
+/* Guest (logged-out) trigger avatar holds a person glyph instead of an initial. */
+.user-avatar.guest svg {
+  display: block;
+}
+/* Login row in the dropdown gets a subtle brand tint on hover. */
+.user-dropdown-item.login:hover {
+  color: var(--ink);
 }
 
 .theme-light .auth-btn.login {

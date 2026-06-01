@@ -24,12 +24,12 @@ import { renderControl } from '../charts/control.js';
 import { renderDonut } from '../charts/donut.js';
 import { renderEpicRoadmap } from '../charts/epic-roadmap.js';
 
-import { getState, activeSprint, DEFAULT_EPIC_FILTERS, subscribeEpicRoadmap } from './state.js';
+import { getState, activeSprint, DEFAULT_EPIC_FILTERS, subscribeEpicRoadmap, consumeSuppressIntroAnim } from './state.js';
 import { t } from './i18n.js';
 import {
   login, logout, setActiveSprint, setView,
   toggleEpicExpanded, openEpicDetail, closeEpicDetail,
-  setEpicFilter, setEpicSearchSilent, ensureEpicsLoaded, setLanguage,
+  setEpicFilter, setEpicSearchSilent, ensureEpicsLoaded, setLanguage, setTheme,
 } from './actions.js';
 
 // ─── Body-panel navigation stack ──────────────────────────────────────────
@@ -476,8 +476,8 @@ function chartCard(title, body, tooltipKey) {
 function topbar() {
   const s = getState();
   return renderTopbar({
-    today: s.today, sourceLabel: s.sourceLabel, user: s.user, lang: s.lang,
-    onLogin: login, onLogout: logout, onLangChange: setLanguage,
+    today: s.today, sourceLabel: s.sourceLabel, user: s.user, lang: s.lang, theme: s.theme,
+    onLogin: login, onLogout: logout, onLangChange: setLanguage, onThemeToggle: setTheme,
   });
 }
 
@@ -492,6 +492,21 @@ function dataSourceBar() {
     loadProgress: s.loadProgress,
   });
 }
+
+// ─── Animated background ─────────────────────────────────────────────────────
+// Mounted ONCE into <body> (outside #root) and left there for the life of the
+// page. It's `position: fixed; z-index: 0` so it sits behind `.app` (z-index 1)
+// regardless of DOM order, and survives the `root.innerHTML = ''` that every full
+// render does. Keeping it persistent means a language switch (which re-renders the
+// whole page) no longer re-randomizes the 24 particles or flashes the screen blank
+// for a frame — the particles just keep drifting.
+function ensureBackground() {
+  if (document.getElementById('bg-mount')) return;
+  const node = renderBackground({ showParticles: true });
+  node.id = 'bg-mount';
+  document.body.insertBefore(node, document.body.firstChild);
+}
+
 
 // ─── Floating Refresh FAB ────────────────────────────────────────────────────
 // Mounted once into <body> (outside #root) so it survives full re-renders and
@@ -557,11 +572,18 @@ export function render() {
   if (!root) return;
   const s = getState();
 
+  ensureBackground();
   root.innerHTML = '';
-  root.appendChild(renderBackground({ showParticles: true }));
+
+  // A language switch re-renders the whole page to swap text; suppress the chart/
+  // stat-bar entry animations for that one render (via `.no-anim` on the shell) so
+  // the redraw doesn't replay the draw-in. First paint / sprint switch leave the
+  // flag unset and animate normally. CSS-only — chart DOM is unchanged (snapshots
+  // stay green). Consume unconditionally so the flag never leaks to a later render.
+  const appClass = consumeSuppressIntroAnim() ? 'app no-anim' : 'app';
 
   if (!s.sprints.length) {
-    root.appendChild(el('div', { class: 'app' }, [
+    root.appendChild(el('div', { class: appClass }, [
       topbar(),
       dataSourceBar(),
       el('div', { class: 'banner info' }, [
@@ -585,7 +607,7 @@ export function render() {
     el('span', {}, [t('app.footer')]),
   ]));
 
-  root.appendChild(el('div', { class: 'app' }, children));
+  root.appendChild(el('div', { class: appClass }, children));
 
   // Ensure FAB is mounted (or updated if already exists)
   ensureFAB();
