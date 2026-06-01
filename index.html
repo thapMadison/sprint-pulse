@@ -1,10 +1,29 @@
 <!DOCTYPE html>
-<html lang="en" class="theme-light">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sprint Pulse — Jira Analytics</title>
   <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+
+  <!-- Resolve the theme before the stylesheets paint so there's no flash of light
+       on a dark-theme load. Mirrors resolveInitialTheme()/applyTheme() in
+       src/app/theme.js; kept inline because ES modules load too late to beat paint.
+       Light adds the `theme-light` override class; dark is the bare :root default. -->
+  <script>
+    (function () {
+      var theme;
+      try {
+        var saved = localStorage.getItem('sprint_pulse_theme');
+        if (saved === 'light' || saved === 'dark') theme = saved;
+      } catch (e) { /* private mode — ignore */ }
+      if (!theme) {
+        theme = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)
+          ? 'dark' : 'light';
+      }
+      document.documentElement.classList.toggle('theme-light', theme !== 'dark');
+    })();
+  </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

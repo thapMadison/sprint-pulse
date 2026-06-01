@@ -1,6 +1,7 @@
 import { DEMO_SPRINTS, DEMO_TODAY } from '../data/demo.js';
 import { VIEW, SOURCE } from './constants.js';
 import { DEFAULT_LANG, LANG_STORAGE_KEY, setActiveLang, t } from './i18n.js';
+import { resolveInitialTheme, setActiveTheme } from './theme.js';
 
 // Epic view filters in their "show everything" default. Reused wherever the Epic
 // view is reset (new data source, refresh, logout) so the shape lives in one place.
@@ -11,6 +12,12 @@ export const DEFAULT_EPIC_FILTERS = { status: 'all', sprintId: 'all', search: ''
 // in the user's chosen language. main.js re-syncs <html lang> on boot too.
 const initialLang = (typeof localStorage !== 'undefined' ? localStorage.getItem(LANG_STORAGE_KEY) : null) || DEFAULT_LANG;
 setActiveLang(initialLang);
+
+// Resolve the colour theme the same way: saved choice → OS preference → light. The
+// inline boot script in index.html already painted with this class; we just record
+// it in-memory so state.theme below stays in sync. See src/app/theme.js.
+const initialTheme = resolveInitialTheme();
+setActiveTheme(initialTheme);
 
 const state = {
   sprints: DEMO_SPRINTS,
@@ -27,6 +34,7 @@ const state = {
   apiPanelOpen: false,
   jiraUrl: (typeof localStorage !== 'undefined' ? localStorage.getItem('sprint_pulse_jira_url') : null) || null,
   lang: (typeof localStorage !== 'undefined' ? localStorage.getItem(LANG_STORAGE_KEY) : null) || DEFAULT_LANG,
+  theme: initialTheme,
   pendingBoardId: '',
   loadProgress: null,
   // Epic view state
@@ -92,6 +100,20 @@ export const subscribeDataSource = dataSource.subscribe;
 // input) that should persist across the next render but not trigger one now.
 export function setStateSilent(patch) {
   Object.assign(state, patch);
+}
+
+// One-shot "don't replay entry animations on the next full render" flag. A
+// language switch re-renders the whole page; without this the charts would replay
+// their 1.6s draw-in and the stat bars their grow, which reads as jank for a mere
+// text swap. setLanguage arms it; render() consumes it once (adds `.no-anim` to
+// the app shell for that render only). First paint and sprint switching leave it
+// unset, so those still animate.
+let _suppressIntroAnim = false;
+export function suppressIntroAnimOnce() { _suppressIntroAnim = true; }
+export function consumeSuppressIntroAnim() {
+  const v = _suppressIntroAnim;
+  _suppressIntroAnim = false;
+  return v;
 }
 
 export function activeSprint() {

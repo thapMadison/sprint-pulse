@@ -34,6 +34,12 @@ export default {
   // ── Language picker ────────────────────────────────────────────────────────────
   'lang.label': 'Ngôn ngữ',
 
+  // ── Account menu + theme switch ───────────────────────────────────────────────
+  'menu.label': 'Cài đặt & tài khoản',
+  'theme.label': 'Giao diện',
+  'theme.light': 'Sáng',
+  'theme.dark': 'Tối',
+
   // ── Status labels (issue/task chips; keep short) ──────────────────────────────
   'status.inprogress': 'Đang làm',
   'status.todo': 'Cần làm',

@@ -13,10 +13,11 @@ import {
   fetchSprintFromWorker, fetchSprintListFromWorker, fetchBoardFromWorker,
   fetchEpicsFromWorker, fetchEpicIssuesFromWorker, fetchIssueDetailFromWorker,
 } from '../services/jira-api.js';
-import { setState, setStateSilent, setEpicRoadmapState, setEpicViewState, setSprintViewState, setLoadProgressState, setDataSourceState, getState, DEFAULT_EPIC_FILTERS } from './state.js';
+import { setState, setStateSilent, setEpicRoadmapState, setEpicViewState, setSprintViewState, setLoadProgressState, setDataSourceState, getState, suppressIntroAnimOnce, DEFAULT_EPIC_FILTERS } from './state.js';
 import { DEMO_EPICS } from '../data/demo.js';
 import { VIEW, SOURCE } from './constants.js';
 import { setActiveLang, isSupported, LANG_STORAGE_KEY, t } from './i18n.js';
+import { setActiveTheme, isSupportedTheme, applyTheme, THEME_STORAGE_KEY } from './theme.js';
 
 const BOARD_ID_KEY = 'jira_board_id';
 
@@ -219,7 +220,27 @@ export function setLanguage(code) {
     if (typeof localStorage !== 'undefined') localStorage.setItem(LANG_STORAGE_KEY, lang);
   } catch { /* storage may be unavailable (private mode) — non-fatal */ }
   if (typeof document !== 'undefined') document.documentElement.lang = lang;
+  // The re-render below only swaps text — suppress chart/bar entry animations for
+  // that one render so a language change doesn't replay the draw-in (jank).
+  suppressIntroAnimOnce();
   setState({ lang });
+}
+
+// Switch colour theme. The theme is 100% CSS — every colour (incl. chart strokes)
+// is a `var(--*)` the browser re-resolves the instant `applyTheme` flips the
+// `theme-light` class on <html>, with CSS transitions for free. So there is NOTHING
+// to re-render: record the choice SILENTLY (no main-channel render) to avoid the
+// whole-page rebuild (background re-randomized, charts re-animated) that caused the
+// jank. The switch button updates its own class on click (see user-menu.js).
+// No-op for an unsupported or unchanged value. Side-effects live here per AGENTS.md.
+export function setTheme(theme) {
+  if (!isSupportedTheme(theme) || theme === getState().theme) return;
+  const resolved = setActiveTheme(theme);
+  try {
+    if (typeof localStorage !== 'undefined') localStorage.setItem(THEME_STORAGE_KEY, resolved);
+  } catch { /* storage may be unavailable (private mode) — non-fatal */ }
+  applyTheme(resolved);
+  setStateSilent({ theme: resolved });
 }
 
 export function setActiveEpic(id) {
