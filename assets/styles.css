@@ -848,6 +848,56 @@ body {
   .stat-grid { grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr; }
 }
 
+@media (max-width: 768px) {
+  .app { padding: 16px 16px 40px; }
+
+  .blob.b1 { width: 320px; height: 320px; }
+  .blob.b2 { width: 280px; height: 280px; }
+  .blob.b3 { width: 240px; height: 240px; }
+  .blob.b4 { width: 200px; height: 200px; }
+
+  .brand h1 { font-size: 18px; }
+  .brand p { display: none; }
+
+  .sprint-tab { padding: 8px 12px; font-size: 12px; gap: 6px; }
+
+  .row.cols-3 { grid-template-columns: 1fr; }
+  .row.cols-2 { grid-template-columns: 1fr; }
+
+  .sprint-hero .donut-wrap svg { width: 150px; height: 150px; }
+
+  .format-panel { grid-template-columns: 1fr 1fr; }
+
+  .footer { flex-direction: column; gap: 4px; }
+}
+
+@media (max-width: 480px) {
+  .app { padding: 12px 12px 32px; }
+
+  .brand-mark { width: 36px; height: 36px; border-radius: 11px; }
+  .brand-mark::after { inset: 5px; border-radius: 7px; }
+  .brand-mark::before { inset: 11px; border-radius: 3px; }
+  .brand h1 { font-size: 16px; }
+  .topbar { gap: 8px; }
+
+  /* Hide the status pill on tiny screens to save space */
+  .topbar-right > .pill { display: none; }
+
+  .sprint-tab { padding: 7px 10px; font-size: 12px; }
+  .sprint-tab .state-dot { display: none; }
+
+  .stat-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
+
+  .sprint-hero .donut-wrap svg { width: 120px; height: 120px; }
+  .donut-center-val { font-size: 22px; }
+
+  .format-panel { grid-template-columns: 1fr; }
+
+  /* Workload issue rows: show only key + summary + status (hide extra num cols) */
+  .issue-row { grid-template-columns: 80px 1fr 130px; }
+  .issue-row > *:nth-child(n+4) { display: none; }
+}
+
 /* ============ Light theme (.theme-light) ============ */
 /* On the pale ivory background, the dark-mode blob halos + screen blend wash
    info out. We dim the abstract background and make cards solid so charts
