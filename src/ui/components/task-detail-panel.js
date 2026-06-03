@@ -176,14 +176,49 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
   const assignee = issue.assignee || { color: 'var(--ink-3)', initials: '?', name: t('task.unassigned') };
 
   // ── Header ─────────────────────────────────────────────────────────────────
+  // Breadcrumb: [Epic key] / [Task key] — mimics Jira's issue header hierarchy.
+  // Always shows epic crumb; displays "No Epic" when issue has no epicKey/epicName.
+  const epicText = issue.epicKey || issue.epicName || null;
+  const epicCrumb = (() => {
+    const label = epicText || t('roadmap.noEpicName');
+    const crumbContent = [
+      issueTypeIcon('epic', { withTitle: false, size: 14 }),
+      el('span', {}, [label]),
+    ];
+    if (epicText && onOpenEpic && issue.epicKey) {
+      return el('button', {
+        type: 'button',
+        class: 'breadcrumb-item breadcrumb-epic',
+        onClick: () => onOpenEpic(issue.epicKey),
+      }, crumbContent);
+    }
+    if (epicText && jiraUrl && issue.epicKey) {
+      return el('a', {
+        href: `${jiraUrl}/browse/${issue.epicKey}`,
+        target: '_blank',
+        rel: 'noopener noreferrer',
+        class: 'breadcrumb-item breadcrumb-epic',
+      }, crumbContent);
+    }
+    return el('span', { class: 'breadcrumb-item breadcrumb-epic breadcrumb-no-epic' }, crumbContent);
+  })();
+
+  const taskCrumb = el('span', { class: 'breadcrumb-item' }, [
+    issueTypeIcon(issue.type, { withTitle: false, size: 14 }),
+    jiraUrl
+      ? el('a', { href: `${jiraUrl}/browse/${issue.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'task-detail-key jira-key-link' }, [issue.key])
+      : el('span', { class: 'task-detail-key' }, [issue.key]),
+  ]);
+
+  const breadcrumb = el('div', { class: 'task-detail-breadcrumb' }, [
+    epicCrumb,
+    el('span', { class: 'breadcrumb-sep' }, ['/']),
+    taskCrumb,
+  ]);
+
   const header = el('div', { class: 'task-detail-header' }, [
     el('div', { class: 'task-detail-head-row' }, [
-      el('span', { class: 'issue-key-cell' }, [
-        issueTypeIcon(issue.type, { size: 18 }),
-        jiraUrl
-          ? el('a', { href: `${jiraUrl}/browse/${issue.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'task-detail-key jira-key-link' }, [issue.key])
-          : el('span', { class: 'task-detail-key' }, [issue.key]),
-      ]),
+      breadcrumb,
       el('span', { class: `status-chip ${issue.status}` }, [
         el('span', { class: 'sdot' }),
         statusLabel(issue),

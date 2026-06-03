@@ -29,7 +29,7 @@ import { t } from './i18n.js';
 import {
   login, logout, setActiveSprint, setView,
   toggleEpicExpanded, openEpicDetail, closeEpicDetail,
-  setEpicFilter, setEpicSearchSilent, ensureEpicsLoaded, setLanguage, setTheme,
+  setEpicFilter, setEpicSearchSilent, ensureEpicsLoaded, ensureEpicKeyLoaded, setLanguage, setTheme,
 } from './actions.js';
 
 // ─── Body-panel navigation stack ──────────────────────────────────────────
@@ -68,11 +68,36 @@ function renderNavTop() {
       jiraUrl: s.jiraUrl,
       onClose: navClose,
       onBack,
-      onOpenEpic: s.epics.length ? (epicKey) => navPush({ type: 'epic', data: epicKey }) : null,
+      onOpenEpic: (epicKey) => navPush({ type: 'epic', data: epicKey }),
     });
   } else {
-    const epic = s.epics.find((e) => e.key === top.data);
-    if (!epic) { navPop(); return; }
+    let epic = s.epics.find((e) => e.key === top.data);
+    // Create stub epic if not found — will be enriched when detail loads
+    if (!epic) {
+      epic = {
+        id: top.data,
+        key: top.data,
+        name: top.data,
+        summary: '',
+        status: 'todo',
+        statusName: '',
+        tasks: [],
+        sprintIds: [],
+        startDate: null,
+        endDate: null,
+        today: s.today,
+        progress: {
+          counts: { todo: 0, inprogress: 0, done: 0 },
+          hours: { todo: 0, inprogress: 0, done: 0 },
+          totalIssues: 0,
+          doneIssues: 0,
+          totalHours: 0,
+          percent: 0,
+        },
+        isNoEpic: false,
+        detailLoaded: false,
+      };
+    }
     _bodyPanelEl = renderEpicDetailPanel({
       epic,
       today: s.today,
@@ -85,7 +110,7 @@ function renderNavTop() {
       document.body.appendChild(_bodyPanelEl);
       // Trigger detail loading if needed, then re-render once detail arrives.
       if (!epic.detailLoaded) {
-        ensureEpicsLoaded();
+        ensureEpicKeyLoaded(top.data);
         const epicKey = top.data;
         const panelEl = _bodyPanelEl;
         const unsub = subscribeEpicRoadmap((updated) => {
@@ -330,7 +355,12 @@ function buildSprintContent(s) {
     ]));
     out.push(el('div', { class: 'row cols-2' }, [
       chartCard(t('app.chartBurnup'), renderBurnup(series), 'burnup'),
-      chartCard(t('app.chartControl'), renderControl(series), 'control'),
+      chartCard(t('app.chartControl'), renderControl(series, {
+        onOpenTask: (p) => {
+          const issue = sprint.issues.find((iss) => iss.key === p.key);
+          if (issue) openTaskPanel(issue);
+        },
+      }), 'control'),
     ]));
     out.push(el('div', { class: 'row' }, [renderWorkloadTable({ sprint, jiraUrl: s.jiraUrl, onOpenTask: openTaskPanel })]));
   }

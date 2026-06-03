@@ -421,6 +421,117 @@ export function ensureEpicsLoaded() {
   }
 }
 
+// Load detail for a single epic by key — used when opening epic panel.
+// Prioritizes the requested epic, then triggers full load for remaining epics.
+async function loadSingleEpic(epicKey) {
+  const s = getState();
+  const source = s.sourceKey;
+
+  // Demo/File mode: no API, trigger full load which marks all as detailLoaded
+  if (source === SOURCE.DEMO || source === SOURCE.FILE) {
+    return loadEpicsAndChangelogs();
+  }
+
+  const workerUrl = await getWorkerUrl();
+  if (!workerUrl) return;
+  const boardId = localStorage.getItem(BOARD_ID_KEY);
+  if (!boardId) return;
+
+  try {
+    const detailData = await fetchEpicIssuesFromWorker(workerUrl, epicKey, boardId);
+    const latest = getState();
+    const epic = latest.epics.find((e) => e.key === epicKey);
+
+    if (epic) {
+      // Epic exists in list — enrich it
+      const enrichedEpic = enrichEpicWithDetail(epic, detailData, latest.today);
+      const updatedEpics = latest.epics.map((e) =>
+        e.id === epic.id ? enrichedEpic : e
+      );
+      setEpicRoadmapState({ epics: updatedEpics });
+    } else {
+      // Epic not in list — build a new one from detail data
+      const enrichedEpic = buildEpicFromDetail(epicKey, detailData, latest.today);
+      const updatedEpics = [...latest.epics, enrichedEpic];
+      setEpicRoadmapState({ epics: updatedEpics });
+    }
+  } catch (e) {
+    console.warn(`[Epic] single epic load failed for ${epicKey}:`, e);
+  }
+}
+
+// Build epic object from API detail data when epic isn't in list yet
+function buildEpicFromDetail(epicKey, detailData, today) {
+  if (!detailData || !detailData.issues || !detailData.issues.length) {
+    return {
+      id: epicKey,
+      key: epicKey,
+      name: epicKey,
+      summary: '',
+      status: 'todo',
+      statusName: '',
+      tasks: [],
+      sprintIds: [],
+      startDate: null,
+      endDate: null,
+      today,
+      progress: {
+        counts: { todo: 0, inprogress: 0, done: 0 },
+        hours: { todo: 0, inprogress: 0, done: 0 },
+        totalIssues: 0,
+        doneIssues: 0,
+        totalHours: 0,
+        percent: 0,
+      },
+      isNoEpic: false,
+      detailLoaded: true,
+    };
+  }
+
+  // Use enrichEpicWithDetail with a minimal stub
+  const stub = {
+    id: epicKey,
+    key: epicKey,
+    name: detailData.epicName || detailData.issues[0]?.epicName || epicKey,
+    summary: detailData.epicSummary || '',
+    status: 'todo',
+    statusName: '',
+    tasks: [],
+    sprintIds: [],
+    startDate: null,
+    endDate: null,
+    today,
+    progress: {
+      counts: { todo: 0, inprogress: 0, done: 0 },
+      hours: { todo: 0, inprogress: 0, done: 0 },
+      totalIssues: 0,
+      doneIssues: 0,
+      totalHours: 0,
+      percent: 0,
+    },
+    isNoEpic: false,
+    detailLoaded: false,
+  };
+  return enrichEpicWithDetail(stub, detailData, today);
+}
+
+// Load detail for a specific epicKey — always loads this epic first, then triggers full load.
+export function ensureEpicKeyLoaded(epicKey) {
+  // Load the requested epic immediately (parallel with full load if needed)
+  loadSingleEpic(epicKey).catch((e) => {
+    console.warn(`[Epic] ensureEpicKeyLoaded failed for ${epicKey}:`, e);
+  });
+
+  // Then trigger full load for remaining epics (if not already running)
+  const s = getState();
+  const needsFullLoad = !s.epics.length || s.epics.some((e) => !e.isNoEpic && !e.detailLoaded && e.key !== epicKey);
+  if (!s.epicLoadProgress && needsFullLoad) {
+    loadEpicsAndChangelogs().catch((e) => {
+      setEpicViewState({ epicError: e.message || String(e) });
+    });
+  }
+}
+
 export function setPendingBoardId(v) {
   // No re-render — would steal focus from the input the user is typing into.
   setStateSilent({ pendingBoardId: v });
