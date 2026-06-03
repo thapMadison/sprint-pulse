@@ -1,5 +1,6 @@
 import { el } from '../dom.js';
 import { refreshFromApi } from '../../app/actions.js';
+import { getState } from '../../app/state.js';
 import { timeAgo } from '../format.js';
 import { attachScrollVisibility } from './scroll-visibility.js';
 import { SOURCE } from '../../app/constants.js';
@@ -27,10 +28,23 @@ export function renderRefreshFAB({ sourceKey, isRefreshing, lastUpdated }) {
     }, [refreshIcon]),
   ]);
 
-  fab._cleanup = attachScrollVisibility(fab, {
+  // Tick every 30 s so "Updated just now" → "1 min ago" → "2 mins ago" updates
+  // in real-time without waiting for a channel fire. Reads current state so the
+  // text stays accurate even between auto-refresh cycles.
+  const tickerId = setInterval(() => {
+    const s = getState();
+    if (!s.isRefreshing) status.textContent = statusText(s);
+  }, 30_000);
+
+  const scrollCleanup = attachScrollVisibility(fab, {
     anchorSelector: '.data-source-bar',
     fallbackScrollY: 100,
   });
+
+  fab._cleanup = () => {
+    clearInterval(tickerId);
+    if (scrollCleanup) scrollCleanup();
+  };
 
   return fab;
 }

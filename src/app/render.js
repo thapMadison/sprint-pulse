@@ -24,7 +24,7 @@ import { renderControl } from '../charts/control.js';
 import { renderDonut } from '../charts/donut.js';
 import { renderEpicRoadmap } from '../charts/epic-roadmap.js';
 
-import { getState, activeSprint, DEFAULT_EPIC_FILTERS, subscribeEpicRoadmap, consumeSuppressIntroAnim } from './state.js';
+import { getState, activeSprint, DEFAULT_EPIC_FILTERS, subscribeEpicRoadmap, consumeSuppressIntroAnim, consumeSuppressSprintAnim } from './state.js';
 import { t } from './i18n.js';
 import {
   login, logout, setActiveSprint, setView,
@@ -391,6 +391,12 @@ export function rerenderSprintView() {
   if (!mount) return; // not on the sprint view — nothing to do
   const s = getState();
   updateSprintFilterActive(s.activeSprintId);
+  // A silent auto-refresh arms suppressSprintAnimOnce so this repaint doesn't
+  // replay the chart draw-in. Toggle `.no-anim` on the mount BEFORE inserting the
+  // new chart nodes (the `.no-anim .line-draw{animation:none}` rule is a descendant
+  // selector) — set/cleared per repaint, so no timer and no late re-trigger, and a
+  // user-driven sprint switch (flag unset) still animates.
+  mount.classList.toggle('no-anim', consumeSuppressSprintAnim());
   mount.replaceChildren(...buildSprintContent(s));
 }
 

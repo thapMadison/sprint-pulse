@@ -13,9 +13,10 @@ import {
   fetchSprintFromWorker, fetchSprintListFromWorker, fetchBoardFromWorker,
   fetchEpicsFromWorker, fetchEpicIssuesFromWorker, fetchIssueDetailFromWorker,
 } from '../services/jira-api.js';
-import { setState, setStateSilent, setEpicRoadmapState, setEpicViewState, setSprintViewState, setLoadProgressState, setDataSourceState, getState, suppressIntroAnimOnce, DEFAULT_EPIC_FILTERS } from './state.js';
+import { setState, setStateSilent, setEpicRoadmapState, setEpicViewState, setSprintViewState, setLoadProgressState, setDataSourceState, getState, suppressIntroAnimOnce, suppressSprintAnimOnce, DEFAULT_EPIC_FILTERS } from './state.js';
 import { DEMO_EPICS } from '../data/demo.js';
 import { VIEW, SOURCE } from './constants.js';
+import { startAutoRefresh, stopAutoRefresh } from './auto-refresh.js';
 import { setActiveLang, isSupported, LANG_STORAGE_KEY, t } from './i18n.js';
 import { setActiveTheme, isSupportedTheme, applyTheme, THEME_STORAGE_KEY } from './theme.js';
 
@@ -120,6 +121,8 @@ function restoreSnapshot(snap, extra = {}) {
   // Only rebuild epics if none were cached — otherwise we'd discard the cached
   // (already-enriched) epics with a fresh fetch. Use Refresh to pull anew.
   if (!(snap.epics && snap.epics.length)) reloadEpicsIfActive();
+  // Restoring a Jira board (boot or board-switch) — start background refresh.
+  if (snap.sourceKey === SOURCE.API) startAutoRefresh();
 }
 
 // Prefer the human-readable board name; fall back to the numeric id.
@@ -596,6 +599,7 @@ export async function logout() {
     // Capture the uid before sign-out so we can wipe that user's cached Jira/
     // file data — it must not linger for the next person on a shared machine.
     const uid = cache.userScope();
+    stopAutoRefresh(); // leaving the API source — no more background polling
     await signOut();
     localStorage.removeItem(BOARD_ID_KEY);
     await cache.clearUser(uid);
@@ -620,6 +624,7 @@ export async function logout() {
 export function loadDemo() {
   // Preserve the source we're leaving so switching back to it is instant.
   persistCurrent();
+  stopAutoRefresh(); // demo has no API source to poll
   setState({
     ...demoSourceState(),
     error: null,
@@ -636,6 +641,7 @@ export async function loadFromFile(file) {
   try {
     // Preserve the source we're leaving so switching back to it is instant.
     persistCurrent();
+    stopAutoRefresh(); // file source has no API to poll
     setProgress('parse', 'file');
     const rawIssues = await parseFile(file);
     if (!rawIssues.length) throw new Error(t('action.fileNoIssues'));
@@ -688,6 +694,8 @@ async function fetchAndApplyBoard(boardId, { extra = {}, keepActiveId = null } =
   persistCurrent();
   await finishProgress();
   reloadEpicsIfActive();
+  // Kick off (or reset, when called from manual Refresh) the background poller.
+  startAutoRefresh();
 }
 
 export async function loadFromApi(boardId) {
@@ -766,6 +774,179 @@ function applyLoadedSprints(sprints, sourceLabel, sourceKey, extra = {}) {
     ...freshEpicUi(),
     ...extra,
   });
+}
+
+// ─────────────────────────── background auto-refresh ───────────────────────────
+// silentRefresh() is the poller's per-cycle entry point (see auto-refresh.js). It
+// pulls fresh Jira data and patches ONLY the regions that actually changed, via
+// the scoped render channels — never setState (full render) or applyLoadedSprints
+// (which resets epic UI state). Open panels, scroll, expanded epics and filters
+// are all preserved. Background failures only console.warn (never showError, which
+// would full-render a banner); the top-level fetch error propagates so the timer
+// can back off.
+
+let _silentCycle = 0;
+
+// Cheap structural signature of the sprint list (+ the active sprint's issues) so
+// we can skip the repaint entirely when nothing changed — no rebuild, no flash.
+function sprintsSignature(sprints, activeId) {
+  const meta = sprints.map((sp) => `${sp.id}:${sp.state}:${sp.startDate}:${sp.endDate}:${sp.name}`).join('|');
+  const active = sprints.find((sp) => sp.id === activeId);
+  const issues = active && active.issuesLoaded
+    ? active.issues.map((i) => `${i.key}:${i.status}:${i.originalEstimate}:${i.timeSpent}`).sort().join(',')
+    : '';
+  return `${meta}#${issues}`;
+}
+
+function sprintsChanged(oldSprints, nextSprints, activeId) {
+  return sprintsSignature(oldSprints, activeId) !== sprintsSignature(nextSprints, activeId);
+}
+
+// Which epics to re-enrich this cycle: in-progress ones every cycle (they change
+// most), plus a full sweep every 4th cycle (~20 min) to catch todo→in-progress
+// transitions. Keeps Epic-tab request volume low on boards with many epics.
+function shouldRefreshEpic(epic) {
+  if (epic.isNoEpic) return false;
+  return epic.status === 'inprogress' || _silentCycle % 4 === 0;
+}
+
+function epicChanged(prev, next) {
+  const p = prev.progress || {};
+  const n = next.progress || {};
+  return prev.status !== next.status
+    || prev.startDate !== next.startDate
+    || prev.endDate !== next.endDate
+    || (prev.tasks?.length || 0) !== (next.tasks?.length || 0)
+    || p.percent !== n.percent
+    || JSON.stringify(p.counts) !== JSON.stringify(n.counts);
+}
+
+export async function silentRefresh() {
+  const s = getState();
+  if (s.sourceKey !== SOURCE.API) {
+    console.log('[AutoRefresh] silentRefresh skipped — not API source:', s.sourceKey);
+    return;
+  }
+  if (s.isRefreshing || s.loadProgress || s.epicLoadProgress) {
+    console.log('[AutoRefresh] silentRefresh skipped — manual refresh/load in progress');
+    return;
+  }
+  if (!isAuthenticated()) {
+    console.log('[AutoRefresh] silentRefresh skipped — not authenticated');
+    return;
+  }
+  if (!localStorage.getItem(BOARD_ID_KEY)) {
+    console.log('[AutoRefresh] silentRefresh skipped — no boardId');
+    return;
+  }
+
+  _silentCycle++;
+  console.log(`[AutoRefresh] silentRefresh cycle #${_silentCycle} (view: ${s.view})`);
+  await refreshSprintsOnly();  // top-level fetch errors propagate → auto-refresh backs off
+  await refreshEpicsOnly();    // no-op unless on the Epic tab
+
+  // Bump the "updated X ago" freshness marker once per successful cycle (even when
+  // data was unchanged — we're verified current as of now). Routes through the
+  // data-source channel so the bar AND the Refresh FAB update text in place; the
+  // sprint content is left untouched. No isRefreshing flip (would spin the FAB).
+  setStateSilent({ lastUpdated: new Date() });
+  persistCurrent();   // save updated timestamp to cache so F5 restore shows correct age
+  setDataSourceState({});
+  console.log('[AutoRefresh] timestamp bumped → "Updated just now"');
+}
+
+async function refreshSprintsOnly() {
+  const workerUrl = await getWorkerUrl();
+  if (!workerUrl) return;
+  const boardId = localStorage.getItem(BOARD_ID_KEY);
+  if (!boardId) return;
+
+  console.log('[AutoRefresh] fetching sprint list...');
+  const rawSprints = await fetchSprintListFromWorker(workerUrl, boardId);
+  if (!rawSprints || !rawSprints.length) {
+    console.log('[AutoRefresh] sprint list empty — skipping');
+    return;
+  }
+  console.log(`[AutoRefresh] sprint list ok (${rawSprints.length} sprints)`);
+
+  const old = getState().sprints;
+  // Rebuild shells from the fresh list, but carry over already-loaded issues for
+  // any sprint the user has viewed (match by jiraId, fall back to slug id) so they
+  // don't revert to a skeleton. Sprints never viewed stay unloaded shells.
+  const merged = buildSprintShells(rawSprints, getState().today).map((shell) => {
+    const prev = old.find((o) => (o.jiraId && shell.jiraId && o.jiraId === shell.jiraId) || o.id === shell.id);
+    if (prev && prev.issuesLoaded) {
+      return { ...shell, issues: prev.issues, issuesLoaded: true, issuesError: prev.issuesError || null };
+    }
+    return shell;
+  });
+
+  // Re-fetch issues for the sprint the user is actually looking at.
+  const activeId = getState().activeSprintId;
+  const activeSprint = merged.find((sp) => sp.id === activeId);
+  console.log(`[AutoRefresh] fetching active sprint issues (${activeSprint?.name || activeId})...`);
+  const i = merged.findIndex((sp) => sp.id === activeId);
+  if (i >= 0 && merged[i].jiraId) {
+    try {
+      const data = await fetchSprintFromWorker(workerUrl, merged[i].jiraId, boardId);
+      merged[i] = populateSprintIssues(merged[i], data.issues || []);
+      console.log(`[AutoRefresh] active sprint issues ok (${merged[i].issues.length} issues)`);
+    } catch (e) {
+      console.warn('[SilentRefresh] active sprint:', e);
+    }
+  }
+
+  if (sprintsChanged(old, merged, activeId)) {
+    console.log('[AutoRefresh] sprint data changed → patching UI (no-anim)');
+    suppressSprintAnimOnce();                 // patch the charts without replaying the draw-in
+    setSprintViewState({ sprints: merged });  // repaints only #sprint-content-mount
+    persistCurrent();
+  } else {
+    console.log('[AutoRefresh] sprint data unchanged — no repaint');
+  }
+}
+
+async function refreshEpicsOnly() {
+  const s = getState();
+  if (s.view !== VIEW.EPIC) {
+    console.log('[AutoRefresh] epic refresh skipped — not on Epic tab');
+    return;
+  }
+  if (!s.epics.length) {
+    console.log('[AutoRefresh] epic refresh skipped — no epics loaded yet');
+    return;
+  }
+  const workerUrl = await getWorkerUrl();
+  if (!workerUrl) return;
+  const boardId = localStorage.getItem(BOARD_ID_KEY);
+  if (!boardId) return;
+
+  const toRefresh = s.epics.filter(shouldRefreshEpic);
+  console.log(`[AutoRefresh] epic refresh: ${toRefresh.length} epic(s) (cycle #${_silentCycle}, sweep=${_silentCycle % 4 === 0}): ${toRefresh.map(e => e.key).join(', ')}`);
+
+  let patched = false;
+  // Sequential (await in the loop) so we never fire a burst of /epic calls.
+  for (const epic of toRefresh) {
+    try {
+      console.log(`[AutoRefresh]   fetching ${epic.key}...`);
+      const detail = await fetchEpicIssuesFromWorker(workerUrl, epic.key, boardId);
+      const enriched = enrichEpicWithDetail(epic, detail, getState().today);
+      if (!epicChanged(epic, enriched)) {
+        console.log(`[AutoRefresh]   ${epic.key} — no change`);
+        continue;
+      }
+      console.log(`[AutoRefresh]   ${epic.key} — changed, patching roadmap`);
+      const updated = getState().epics.map((e) => (e.id === epic.id ? enriched : e));
+      // Mirror progressive-load routing: if this epic's detail panel is open,
+      // repaint the whole Epic view so the panel updates too; else just the roadmap.
+      if (getState().epicDetailId === epic.id) setEpicViewState({ epics: updated });
+      else setEpicRoadmapState({ epics: updated });
+      patched = true;
+    } catch (e) {
+      console.warn(`[SilentRefresh] epic ${epic.key}:`, e);
+    }
+  }
+  if (patched) persistCurrent();
 }
 
 export function getSavedBoardId() {

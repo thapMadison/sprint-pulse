@@ -116,6 +116,20 @@ export function consumeSuppressIntroAnim() {
   return v;
 }
 
+// Same one-shot, but for the scoped Sprint-content repaint (rerenderSprintView).
+// A background auto-refresh patches the sprint charts via setSprintViewState,
+// which replaceChildren()s the mount and would replay the 1.6s chart draw-in —
+// jank for a silent update. silentRefresh arms this right before the patch;
+// rerenderSprintView consumes it once to add `.no-anim` to the mount for that
+// repaint only, so a user-driven sprint switch still animates normally.
+let _suppressSprintAnim = false;
+export function suppressSprintAnimOnce() { _suppressSprintAnim = true; }
+export function consumeSuppressSprintAnim() {
+  const v = _suppressSprintAnim;
+  _suppressSprintAnim = false;
+  return v;
+}
+
 export function activeSprint() {
   return state.sprints.find((s) => s.id === state.activeSprintId) || state.sprints[0];
 }

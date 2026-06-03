@@ -19,9 +19,12 @@ subscribeDataSource(rerenderDataSource);
 // Keep the floating Refresh FAB in step with refresh state. refreshFromApi flips
 // isRefreshing via the main channel (full render handles it), and lands the new
 // lastUpdated / isRefreshing:false via the sprint-view channel — subscribe to
-// both so the FAB's status + spinner update in place either way.
+// both so the FAB's status + spinner update in place either way. The data-source
+// channel carries the silent auto-refresh's "updated X ago" bump, so the FAB's
+// timestamp ticks too without repainting the sprint content.
 subscribeSprintView(rerenderFAB);
 subscribeLoadProgress(rerenderFAB);
+subscribeDataSource(rerenderFAB);
 
 initFirebase().then(() => {
   onAuthStateChange((user) => {
