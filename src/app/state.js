@@ -78,7 +78,10 @@ const epicRoadmap = createChannel(); // progressive per-epic detail enrichment
 const epicView = createChannel();    // Epic tab: filter/expand/detail interactions
 const sprintView = createChannel();  // lazy per-sprint issue loading (skeleton → charts)
 const loadProgress = createChannel(); // Jira connect/pull/convert progress strip
-const dataSource = createChannel();  // inline Board ID panel open/close
+const dataSource = createChannel();  // inline Board ID panel open/close, refresh state
+const view = createChannel();        // Sprint ↔ Epic tab switch (no full render)
+const error = createChannel();       // show/clear error banner in place
+const topbar = createChannel();      // topbar repaint (user auth state on boot)
 
 // Full-page render.
 export const setState = main.set;
@@ -95,6 +98,12 @@ export const setLoadProgressState = loadProgress.set;
 export const subscribeLoadProgress = loadProgress.subscribe;
 export const setDataSourceState = dataSource.set;
 export const subscribeDataSource = dataSource.subscribe;
+export const setViewState = view.set;
+export const subscribeView = view.subscribe;
+export const setErrorState = error.set;
+export const subscribeError = error.subscribe;
+export const setTopbarState = topbar.set;
+export const subscribeTopbar = topbar.subscribe;
 
 // Mutate without re-rendering. Used for transient UI state (e.g. text in an
 // input) that should persist across the next render but not trigger one now.
@@ -116,10 +125,26 @@ export function consumeSuppressIntroAnim() {
   return v;
 }
 
+// Same one-shot, but for the scoped Sprint-content repaint (rerenderSprintView).
+// A background auto-refresh patches the sprint charts via setSprintViewState,
+// which replaceChildren()s the mount and would replay the 1.6s chart draw-in —
+// jank for a silent update. silentRefresh arms this right before the patch;
+// rerenderSprintView consumes it once to add `.no-anim` to the mount for that
+// repaint only, so a user-driven sprint switch still animates normally.
+let _suppressSprintAnim = false;
+export function suppressSprintAnimOnce() { _suppressSprintAnim = true; }
+export function consumeSuppressSprintAnim() {
+  const v = _suppressSprintAnim;
+  _suppressSprintAnim = false;
+  return v;
+}
+
 export function activeSprint() {
   return state.sprints.find((s) => s.id === state.activeSprintId) || state.sprints[0];
 }
 
+// activeEpic(): no render callers (kept for test coverage and future use;
+// activeEpicId is still assigned in state-reset patches).
 export function activeEpic() {
   if (!state.activeEpicId) return state.epics[0] || null;
   return state.epics.find((e) => e.id === state.activeEpicId) || state.epics[0] || null;

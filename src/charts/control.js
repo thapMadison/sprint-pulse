@@ -3,7 +3,7 @@ import { el } from '../ui/dom.js';
 import { chartGeometry, buildXs, yScaleOf, renderGridAndAxes } from '../ui/chart-helpers.js';
 import { t } from '../app/i18n.js';
 
-export function renderControl(series) {
+export function renderControl(series, { onOpenTask } = {}) {
   const geom = chartGeometry({ H: 260 });
   const { W, PAD, innerW } = geom;
   const { days, controlPoints } = series;
@@ -61,7 +61,10 @@ export function renderControl(series) {
       r: isOutlier ? 6 : 5,
     });
     c.style.animation = `barRise 0.6s ${i * 0.05}s both cubic-bezier(0.2,0.8,0.2,1)`;
-    c.style.cursor = 'pointer';
+    c.style.cursor = onOpenTask ? 'pointer' : 'default';
+    if (onOpenTask) {
+      c.addEventListener('click', () => onOpenTask(p));
+    }
     const title = svg('title', {}, [tooltip]);
     c.appendChild(title);
     children.push(c);

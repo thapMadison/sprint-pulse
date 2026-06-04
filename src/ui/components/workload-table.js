@@ -1,12 +1,12 @@
 import { el } from '../dom.js';
 import { svg } from '../../charts/svg.js';
-import { statusLabel } from '../format.js';
+import { statusLabel, jiraLink } from '../format.js';
 import { issueTypeIcon } from './issue-type-icon.js';
 import { t } from '../../app/i18n.js';
 
 function renderIssueRow(iss, onOpen, jiraUrl) {
   const keyNode = jiraUrl
-    ? el('a', { href: `${jiraUrl}/browse/${iss.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'jira-key-link', onClick: (e) => e.stopPropagation() }, [iss.key])
+    ? jiraLink({ jiraUrl, key: iss.key, class: 'jira-key-link', stopClick: true })
     : el('span', {}, [iss.key]);
   return el('div', { class: 'issue-row issue-row-clickable', onClick: () => onOpen(iss) }, [
     el('span', { class: 'key issue-key-cell' }, [

@@ -1,6 +1,6 @@
 import { initFirebase, onAuthStateChange } from '../services/auth.js';
-import { setState, subscribe, subscribeEpicRoadmap, subscribeEpicView, subscribeSprintView, subscribeLoadProgress, subscribeDataSource, getState } from './state.js';
-import { render, rerenderEpicRoadmap, rerenderEpicView, rerenderSprintView, rerenderProgress, rerenderDataSource, rerenderFAB } from './render.js';
+import { setState, subscribe, subscribeEpicRoadmap, subscribeEpicView, subscribeSprintView, subscribeLoadProgress, subscribeDataSource, subscribeView, subscribeError, subscribeTopbar, setTopbarState, getState } from './state.js';
+import { render, rerenderEpicRoadmap, rerenderEpicView, rerenderSprintView, rerenderProgress, rerenderDataSource, rerenderFAB, rerenderView, rerenderViewTabsFAB, rerenderError, rerenderTopbar } from './render.js';
 import { restoreLastSource, flushCache } from './actions.js';
 import { setActiveLang } from './i18n.js';
 
@@ -15,17 +15,26 @@ subscribeEpicView(rerenderEpicView);
 subscribeSprintView(rerenderSprintView);
 subscribeLoadProgress(rerenderProgress);
 subscribeDataSource(rerenderDataSource);
+subscribeView(rerenderView);
+subscribeView(rerenderViewTabsFAB);
+subscribeError(rerenderError);
+subscribeTopbar(rerenderTopbar);
 
 // Keep the floating Refresh FAB in step with refresh state. refreshFromApi flips
 // isRefreshing via the main channel (full render handles it), and lands the new
 // lastUpdated / isRefreshing:false via the sprint-view channel — subscribe to
-// both so the FAB's status + spinner update in place either way.
+// both so the FAB's status + spinner update in place either way. The data-source
+// channel carries the silent auto-refresh's "updated X ago" bump, so the FAB's
+// timestamp ticks too without repainting the sprint content.
 subscribeSprintView(rerenderFAB);
 subscribeLoadProgress(rerenderFAB);
+subscribeDataSource(rerenderFAB);
 
 initFirebase().then(() => {
   onAuthStateChange((user) => {
-    setState({ user });
+    // user is only read by the topbar — repaint just that region so the first
+    // auth-resolve after boot doesn't replay every chart's draw-in animation.
+    setTopbarState({ user });
     // Once auth resolves, restore the data source the user was last on (Jira
     // board / file) instead of leaving them on demo. No-op after it succeeds.
     restoreLastSource(user).catch((e) => console.warn('[boot] restore failed:', e));

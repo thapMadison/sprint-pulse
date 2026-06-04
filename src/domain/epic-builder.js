@@ -14,6 +14,42 @@ import { makeUserPool } from './sprint-builder.js';
 
 export const NO_EPIC_ID = '__NO_EPIC__';
 
+// Zeroed progress slice for an epic with no tasks loaded yet — the shape the
+// roadmap/detail panel reads before enrichment fills it in.
+export function emptyEpicProgress() {
+  return {
+    counts: { todo: 0, inprogress: 0, done: 0 },
+    hours: { todo: 0, inprogress: 0, done: 0 },
+    totalIssues: 0,
+    doneIssues: 0,
+    totalHours: 0,
+    percent: 0,
+  };
+}
+
+// A placeholder Epic shown immediately while its real detail is fetched (opening
+// an epic panel by key, or building one from API detail before it's in the list).
+// enrichEpicWithDetail later replaces the fields; until then this keeps the UI
+// from crashing on missing progress/tasks.
+export function buildStubEpic(key, { name, summary = '', today = null, detailLoaded = false } = {}) {
+  return {
+    id: key,
+    key,
+    name: name || key,
+    summary,
+    status: 'todo',
+    statusName: '',
+    tasks: [],
+    sprintIds: [],
+    startDate: null,
+    endDate: null,
+    today,
+    progress: emptyEpicProgress(),
+    isNoEpic: false,
+    detailLoaded,
+  };
+}
+
 function categoryKey(toStatus) {
   if (!toStatus) return null;
   if (toStatus.statusCategory && toStatus.statusCategory.key) {
