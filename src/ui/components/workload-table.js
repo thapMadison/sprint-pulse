@@ -77,6 +77,23 @@ function issueMatches(iss, q) {
   return `${iss.key} ${iss.summary}`.toLowerCase().includes(q);
 }
 
+const STATUS_FILTER_OPTIONS = [
+  { value: 'all',        labelKey: 'workload.filterAll' },
+  { value: 'todo',       labelKey: 'workload.filterTodo' },
+  { value: 'inprogress', labelKey: 'workload.filterInprogress' },
+  { value: 'done',       labelKey: 'workload.filterDone' },
+];
+
+function renderStatusFilterBtns(current, onChange) {
+  return STATUS_FILTER_OPTIONS.map((opt) =>
+    el('button', {
+      class: `roadmap-filter-chip ${current === opt.value ? 'active' : ''}`,
+      type: 'button',
+      onClick: () => onChange(opt.value),
+    }, [t(opt.labelKey)])
+  );
+}
+
 function chevronCell() {
   const span = el('span', { class: 'expand-icon' }, []);
   span.appendChild(svg('svg', {
@@ -112,6 +129,7 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
   const allRows = groupByUser(sprint.issues);
   let expandedUserId = null;
   let query = '';
+  let statusFilter = 'all';
 
   const tbody = el('tbody', {}, []);
 
@@ -121,22 +139,25 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
     // When searching, only show users with ≥1 matching task, auto-expand them,
     // and list only the matching tasks inside.
     const searching = query.length > 0;
+    const filtering = statusFilter !== 'all';
 
     for (const row of allRows) {
-      const matchingIssues = searching ? row.issues.filter((i) => issueMatches(i, query)) : row.issues;
-      if (searching && matchingIssues.length === 0) continue;
+      let matchingIssues = row.issues;
+      if (filtering) matchingIssues = matchingIssues.filter((i) => i.status === statusFilter);
+      if (searching) matchingIssues = matchingIssues.filter((i) => issueMatches(i, query));
+      if ((searching || filtering) && matchingIssues.length === 0) continue;
 
       const totalCt = row.issues.length || 1;
       const segDone = (row.counts.done / totalCt) * 100;
       const segInProg = (row.counts.inprogress / totalCt) * 100;
       const segTodo = (row.counts.todo / totalCt) * 100;
-      // While searching, every shown user is auto-expanded; otherwise honour the click state.
-      const isOpen = searching ? true : expandedUserId === row.user.id;
+      // While searching or filtering, every shown user is auto-expanded; otherwise honour the click state.
+      const isOpen = (searching || filtering) ? true : expandedUserId === row.user.id;
 
       const tr = el('tr', {
         class: isOpen ? 'expanded' : '',
         onClick: () => {
-          if (searching) return; // expansion is forced while searching
+          if (searching || filtering) return; // expansion is forced while filtering
           expandedUserId = isOpen ? null : row.user.id;
           renderBody();
         },
@@ -150,7 +171,7 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
             el('div', {}, [
               el('div', { class: 'name' }, [row.user.name]),
               el('div', { class: 'sub' }, [
-                searching
+                (searching || filtering)
                   ? t('workload.matchCount', { matching: matchingIssues.length, total: totalCt })
                   : t('workload.issueCount', { count: totalCt }),
               ]),
@@ -192,16 +213,15 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
       }
     }
 
-    // No user matched the query.
-    if (query && tbody.children.length === 0) {
+    // No user matched the active filters.
+    if ((query || filtering) && tbody.children.length === 0) {
       tbody.appendChild(el('tr', {}, [
         el('td', { colSpan: 6, style: { textAlign: 'center', color: 'var(--ink-3)', padding: '24px' } }, [
-          t('workload.noMatch', { query }),
+          query ? t('workload.noMatch', { query }) : t('workload.noMatchStatus'),
         ]),
       ]));
     }
   }
-  renderBody();
 
   const searchInput = el('input', {
     class: 'workload-search-input',
@@ -212,14 +232,35 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
     query = searchInput.value.trim().toLowerCase();
     renderBody();
   });
-  const searchBox = el('div', { class: 'workload-search' }, [searchIcon(), searchInput]);
+  const searchWrap = el('div', { class: 'workload-search roadmap-filter-search-wrap' }, [searchIcon(), searchInput]);
+
+  const chipsWrap = el('div', { class: 'roadmap-filter-chips' }, []);
+
+  function renderFilterBar() {
+    chipsWrap.innerHTML = '';
+    renderStatusFilterBtns(statusFilter, (val) => {
+      statusFilter = val;
+      renderFilterBar();
+      renderBody();
+    }).forEach((btn) => chipsWrap.appendChild(btn));
+  }
+  renderFilterBar();
+  renderBody();
+
+  const filterBar = el('div', { class: 'workload-filter-bar' }, [
+    el('div', { class: 'roadmap-filter-group' }, [
+      el('span', { class: 'roadmap-filter-label' }, [t('workload.filterLabel')]),
+      chipsWrap,
+    ]),
+    searchWrap,
+  ]);
 
   return el('div', { class: 'card' }, [
     el('h3', { class: 'card-title' }, [
       el('span', {}, [t('workload.title')]),
       el('span', { class: 'card-subtitle' }, [t('workload.subtitle', { count: allRows.length })]),
     ]),
-    searchBox,
+    filterBar,
     el('table', { class: 'workload-table' }, [
       el('thead', {}, [
         el('tr', {}, [

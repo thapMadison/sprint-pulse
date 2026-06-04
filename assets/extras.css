@@ -2963,13 +2963,20 @@ html.theme-light {
 }
 
 /* ============================================================
-   Workload Report — task search box
+   Workload Report — status filter + search box (single row)
    ============================================================ */
+.workload-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
 .workload-search {
   position: relative;
   display: flex;
   align-items: center;
-  margin: 4px 0 14px;
 }
 .workload-search-icon {
   position: absolute;
