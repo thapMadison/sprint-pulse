@@ -1,6 +1,19 @@
 // Small formatting helpers shared across UI components.
 
 import { t } from '../app/i18n.js';
+import { el } from './dom.js';
+
+// A link to an issue/epic in Jira ("<base>/browse/<KEY>"), opened in a new tab.
+// Centralizes the `target`/`rel`/href shape that was copy-pasted across the
+// workload table, epic tasks table, heroes, roadmap and task panel.
+//   class:     the anchor's className (call sites use different ones)
+//   children:  custom inner nodes; defaults to the key text
+//   stopClick: swallow the click so it doesn't also trigger a row/panel handler
+export function jiraLink({ jiraUrl, key, class: cls, children, stopClick = false }) {
+  const attrs = { href: `${jiraUrl}/browse/${key}`, target: '_blank', rel: 'noopener noreferrer', class: cls };
+  if (stopClick) attrs.onClick = (e) => e.stopPropagation();
+  return el('a', attrs, children || [key]);
+}
 
 const STATUS_KEY = { inprogress: 'status.inprogress', todo: 'status.todo', done: 'status.done' };
 

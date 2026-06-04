@@ -2,6 +2,7 @@ import { el } from '../ui/dom.js';
 import { svg } from '../charts/svg.js';
 import { generateDailySeries } from '../domain/series.js';
 import { filterEpics } from '../domain/epic-filters.js';
+import { buildStubEpic } from '../domain/epic-builder.js';
 
 import { renderBackground } from '../ui/components/background.js';
 import { renderTopbar } from '../ui/components/topbar.js';
@@ -25,6 +26,7 @@ import { renderDonut } from '../charts/donut.js';
 import { renderEpicRoadmap } from '../charts/epic-roadmap.js';
 
 import { getState, activeSprint, DEFAULT_EPIC_FILTERS, subscribeEpicRoadmap, consumeSuppressIntroAnim, consumeSuppressSprintAnim } from './state.js';
+// (subscribeView, subscribeError, subscribeTopbar wired in main.js — not needed here)
 import { t } from './i18n.js';
 import {
   login, logout, setActiveSprint, setView,
@@ -73,31 +75,7 @@ function renderNavTop() {
   } else {
     let epic = s.epics.find((e) => e.key === top.data);
     // Create stub epic if not found — will be enriched when detail loads
-    if (!epic) {
-      epic = {
-        id: top.data,
-        key: top.data,
-        name: top.data,
-        summary: '',
-        status: 'todo',
-        statusName: '',
-        tasks: [],
-        sprintIds: [],
-        startDate: null,
-        endDate: null,
-        today: s.today,
-        progress: {
-          counts: { todo: 0, inprogress: 0, done: 0 },
-          hours: { todo: 0, inprogress: 0, done: 0 },
-          totalIssues: 0,
-          doneIssues: 0,
-          totalHours: 0,
-          percent: 0,
-        },
-        isNoEpic: false,
-        detailLoaded: false,
-      };
-    }
+    if (!epic) epic = buildStubEpic(top.data, { today: s.today });
     _bodyPanelEl = renderEpicDetailPanel({
       epic,
       today: s.today,
@@ -603,6 +581,61 @@ export function rerenderViewTabsFAB() {
   ensureViewTabsFAB();
 }
 
+// ─── View-switch scoped repaint (A.1) ────────────────────────────────────────
+
+// Toggle `.active` on the in-flow view-tab buttons by data-key.
+// Mirrors updateViewTabsFAB without touching the FAB node.
+function updateViewTabsActive(active) {
+  const tabs = document.querySelector('.view-tabs:not(.view-tabs-fab)');
+  if (!tabs) return;
+  tabs.querySelectorAll('.view-tab').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.key === active);
+  });
+}
+
+// Build the view-specific content nodes (either sprint or epic mount).
+// Keeps the two stable mount IDs so rerenderSprintView / rerenderEpicView work.
+function buildActiveView(s) {
+  if (s.view === 'epic') {
+    return [el('div', { id: 'epic-view-mount' }, renderEpicView())];
+  }
+  return [el('div', { id: 'sprint-view-mount' }, buildSprintView(s))];
+}
+
+// Swap only the view content inside #view-mount and update the active class on
+// both sets of tabs. Topbar / data-source bar / footer stay untouched.
+export function rerenderView() {
+  const mount = document.getElementById('view-mount');
+  if (!mount) return;
+  const s = getState();
+  updateViewTabsActive(s.view);
+  updateViewTabsFAB(document.getElementById('view-tabs-fab-mount'), { active: s.view });
+  mount.replaceChildren(...buildActiveView(s));
+}
+
+// ─── Error-banner scoped repaint (A.5) ───────────────────────────────────────
+
+// Fill or clear the stable #app-error-mount without touching the rest of the page.
+export function rerenderError() {
+  const mount = document.getElementById('app-error-mount');
+  if (!mount) return;
+  const { error } = getState();
+  if (error) {
+    mount.replaceChildren(el('div', { class: 'banner error' }, [error]));
+  } else {
+    mount.replaceChildren();
+  }
+}
+
+// ─── Topbar scoped repaint (A.6) ─────────────────────────────────────────────
+
+// Swap only the topbar node; everything below is untouched.
+export function rerenderTopbar() {
+  const mount = document.getElementById('topbar-mount');
+  if (!mount) return;
+  mount.replaceChildren(topbar());
+}
+
 export function render() {
   const root = document.getElementById('root');
   if (!root) return;
@@ -620,28 +653,24 @@ export function render() {
 
   if (!s.sprints.length) {
     root.appendChild(el('div', { class: appClass }, [
-      topbar(),
-      dataSourceBar(),
-      el('div', { class: 'banner info' }, [
-        t('app.noSprintsFound'),
-      ]),
+      el('div', { id: 'topbar-mount' }, [topbar()]),
+      el('div', { id: 'data-source-mount' }, [dataSourceBar()]),
+      el('div', { id: 'app-error-mount' }, s.error ? [el('div', { class: 'banner error' }, [s.error])] : []),
+      el('div', { class: 'banner info' }, [t('app.noSprintsFound')]),
     ]));
     return;
   }
 
-  const children = [topbar(), el('div', { id: 'data-source-mount' }, [dataSourceBar()])];
-  children.push(renderViewTabs({ active: s.view, onChange: setView }));
-  if (s.error) children.push(el('div', { class: 'banner error' }, [s.error]));
-
-  if (s.view === 'epic') {
-    children.push(el('div', { id: 'epic-view-mount' }, renderEpicView()));
-  } else {
-    children.push(el('div', { id: 'sprint-view-mount' }, buildSprintView(s)));
-  }
-
-  children.push(el('footer', { class: 'footer' }, [
-    el('span', {}, [t('app.footer')]),
-  ]));
+  // Stable mount IDs let scoped channel repaints target individual regions without
+  // touching the rest of the page. The IDs must survive across full renders.
+  const children = [
+    el('div', { id: 'topbar-mount' }, [topbar()]),
+    el('div', { id: 'data-source-mount' }, [dataSourceBar()]),
+    renderViewTabs({ active: s.view, onChange: setView }),
+    el('div', { id: 'app-error-mount' }, s.error ? [el('div', { class: 'banner error' }, [s.error])] : []),
+    el('div', { id: 'view-mount' }, buildActiveView(s)),
+    el('footer', { class: 'footer' }, [el('span', {}, [t('app.footer')])]),
+  ];
 
   root.appendChild(el('div', { class: appClass }, children));
 

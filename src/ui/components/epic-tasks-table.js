@@ -1,5 +1,5 @@
 import { el } from '../dom.js';
-import { statusLabel, shortSprintName, fmtDateShort } from '../format.js';
+import { statusLabel, shortSprintName, fmtDateShort, jiraLink } from '../format.js';
 import { issueTypeIcon } from './issue-type-icon.js';
 import { renderUserCell } from './user-cell.js';
 import { STATUS_ORDER } from '../../app/constants.js';
@@ -25,7 +25,7 @@ export function renderEpicTasksTable({ epic, jiraUrl, onOpenTask }) {
   const rows = tasks.map((task) => {
     const assignee = task.assignee || { color: 'var(--ink-3)', initials: '?', name: t('task.unassigned') };
     const keyNode = jiraUrl
-      ? el('a', { href: `${jiraUrl}/browse/${task.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'mono-key jira-key-link', onClick: (e) => e.stopPropagation() }, [task.key])
+      ? jiraLink({ jiraUrl, key: task.key, class: 'mono-key jira-key-link', stopClick: true })
       : el('span', { class: 'mono-key' }, [task.key]);
     const trAttrs = onOpenTask ? { class: 'epic-task-clickable', onClick: () => onOpenTask(task) } : {};
     return el('tr', trAttrs, [

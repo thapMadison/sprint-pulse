@@ -1,6 +1,7 @@
 import { el } from '../dom.js';
 import { fmtDate, fmtDow, metaItem, dayUnit } from '../hero-helpers.js';
 import { issueTypeIcon } from './issue-type-icon.js';
+import { jiraLink } from '../format.js';
 import { t } from '../../app/i18n.js';
 
 function daysBetween(a, b) {
@@ -73,7 +74,7 @@ export function renderEpicHero({ epic, today, jiraUrl }) {
           el('span', { class: 'issue-key-cell' }, [
             epic.isNoEpic ? null : issueTypeIcon('epic', { size: 18, withTitle: false }),
             (jiraUrl && !epic.isNoEpic)
-              ? el('a', { href: `${jiraUrl}/browse/${epic.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'epic-hero-key jira-key-link' }, [epic.key])
+              ? jiraLink({ jiraUrl, key: epic.key, class: 'epic-hero-key jira-key-link' })
               : el('span', { class: 'epic-hero-key' }, [epic.isNoEpic ? t('epicHero.noEpic') : epic.key]),
           ]),
           el('span', { class: 'epic-hero-name' }, [epic.name]),

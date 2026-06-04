@@ -1,5 +1,5 @@
 import { el } from '../dom.js';
-import { statusLabel, fmtDateSlash, fmtDateTime, initials } from '../format.js';
+import { statusLabel, fmtDateSlash, fmtDateTime, initials, jiraLink } from '../format.js';
 import { normalizeStatus, extractStatusName } from '../../domain/status.js';
 import { issueTypeIcon, issueTypeBadge } from './issue-type-icon.js';
 import { renderUserCell } from './user-cell.js';
@@ -52,9 +52,9 @@ function epicBadge(issue, jiraUrl, onOpenEpic) {
     }, badgeChildren);
   }
   if (jiraUrl && issue.epicKey) {
-    return el('a', { href: `${jiraUrl}/browse/${issue.epicKey}`, target: '_blank', rel: 'noopener noreferrer', class: 'jira-key-link' }, [
+    return jiraLink({ jiraUrl, key: issue.epicKey, class: 'jira-key-link', children: [
       el('span', { class: 'issue-type-badge epic-ref-badge' }, badgeChildren),
-    ]);
+    ] });
   }
   return el('span', { class: 'issue-type-badge epic-ref-badge' }, badgeChildren);
 }
@@ -193,12 +193,7 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
       }, crumbContent);
     }
     if (epicText && jiraUrl && issue.epicKey) {
-      return el('a', {
-        href: `${jiraUrl}/browse/${issue.epicKey}`,
-        target: '_blank',
-        rel: 'noopener noreferrer',
-        class: 'breadcrumb-item breadcrumb-epic',
-      }, crumbContent);
+      return jiraLink({ jiraUrl, key: issue.epicKey, class: 'breadcrumb-item breadcrumb-epic', children: crumbContent });
     }
     return el('span', { class: 'breadcrumb-item breadcrumb-epic breadcrumb-no-epic' }, crumbContent);
   })();
@@ -206,7 +201,7 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
   const taskCrumb = el('span', { class: 'breadcrumb-item' }, [
     issueTypeIcon(issue.type, { withTitle: false, size: 14 }),
     jiraUrl
-      ? el('a', { href: `${jiraUrl}/browse/${issue.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'task-detail-key jira-key-link' }, [issue.key])
+      ? jiraLink({ jiraUrl, key: issue.key, class: 'task-detail-key jira-key-link' })
       : el('span', { class: 'task-detail-key' }, [issue.key]),
   ]);
 

@@ -4,7 +4,7 @@
 // - Click chevron to expand an epic and reveal its task rows underneath.
 // - Click epic name to open the side detail panel.
 import { el } from '../ui/dom.js';
-import { shortSprintName } from '../ui/format.js';
+import { shortSprintName, jiraLink } from '../ui/format.js';
 import { issueTypeIcon } from '../ui/components/issue-type-icon.js';
 import { filterEpics } from '../domain/epic-filters.js';
 import { STATUS_ORDER } from '../app/constants.js';
@@ -241,7 +241,7 @@ function todayMarker(today, dayToPct) {
 
 function epicRow({ epic, expanded, dayToPct, today, jiraUrl, onToggle, onOpenDetail }) {
   const keyNode = (jiraUrl && !epic.isNoEpic)
-    ? el('a', { href: `${jiraUrl}/browse/${epic.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'roadmap-key jira-key-link', onClick: (e) => e.stopPropagation() }, [epic.key])
+    ? jiraLink({ jiraUrl, key: epic.key, class: 'roadmap-key jira-key-link', stopClick: true })
     : el('span', { class: 'roadmap-key' }, [epic.isNoEpic ? t('roadmap.noEpic') : epic.key]);
 
   const left = el('div', { class: 'roadmap-row-left epic-left' }, [
@@ -276,7 +276,7 @@ function epicRow({ epic, expanded, dayToPct, today, jiraUrl, onToggle, onOpenDet
 
 function taskRow({ task, dayToPct, today, sprints, jiraUrl, onOpenTask }) {
   const keyNode = jiraUrl
-    ? el('a', { href: `${jiraUrl}/browse/${task.key}`, target: '_blank', rel: 'noopener noreferrer', class: 'roadmap-task-key jira-key-link', onClick: (e) => e.stopPropagation() }, [task.key])
+    ? jiraLink({ jiraUrl, key: task.key, class: 'roadmap-task-key jira-key-link', stopClick: true })
     : el('span', { class: 'roadmap-task-key' }, [task.key]);
 
   const leftClass = `roadmap-row-left task-left${onOpenTask ? ' roadmap-task-clickable' : ''}`;
