@@ -6,6 +6,17 @@ import { renderUserCell } from './user-cell.js';
 import { renderPanelShell } from './panel-shell.js';
 import { fetchTaskDetail } from '../../app/actions.js';
 import { t } from '../../app/i18n.js';
+import { getState, activeSprint } from '../../app/state.js';
+import { effectiveColorMap } from '../../domain/status-colors.js';
+
+function makeChipStyles(statusName, colorMap) {
+  const color = colorMap[statusName] || null;
+  if (!color) return {};
+  return {
+    chip: { background: `color-mix(in oklch, ${color} 18%, transparent)`, color },
+    sdot: { background: color },
+  };
+}
 
 // One labelled meta field (label above value). Returns { field, valueEl } so
 // callers can replace the skeleton with real data without touching the layout.
@@ -103,7 +114,7 @@ function effortTiles(iss) {
 }
 
 // Vertical status-change timeline (always available from sprint data, no lazy fetch).
-function statusTimeline(iss) {
+function statusTimeline(iss, colorMap) {
   const changes = iss.statusChanges || [];
   if (!changes.length) {
     return el('p', { class: 'task-detail-empty' }, [t('task.noStatusHistory')]);
@@ -113,11 +124,12 @@ function statusTimeline(iss) {
     changes.map((ch) => {
       const cat = normalizeStatus(ch.toStatus);
       const name = extractStatusName(ch.toStatus) || cat;
+      const cs = makeChipStyles(name, colorMap);
       return el('div', { class: 'task-timeline-item' }, [
         el('span', { class: `task-timeline-dot ${cat}` }),
         el('div', { class: 'task-timeline-content' }, [
-          el('span', { class: `status-chip ${cat}` }, [
-            el('span', { class: 'sdot' }),
+          el('span', { class: `status-chip ${cat}`, style: cs.chip || {} }, [
+            el('span', { class: 'sdot', style: cs.sdot || {} }),
             name,
           ]),
           el('span', { class: 'task-timeline-date' }, [fmtDateSlash(ch.date)]),
@@ -173,6 +185,10 @@ function loadingLine(text) {
 export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onBack }) {
   if (!issue) return null;
 
+  const { statusColorMap } = getState();
+  const sprint = activeSprint();
+  const colorMap = effectiveColorMap(statusColorMap, sprint?.issues || []);
+
   const assignee = issue.assignee || { color: 'var(--ink-3)', initials: '?', name: t('task.unassigned') };
 
   // ── Header ─────────────────────────────────────────────────────────────────
@@ -211,11 +227,12 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
     taskCrumb,
   ]);
 
+  const issueCs = makeChipStyles(issue.statusName, colorMap);
   const header = el('div', { class: 'task-detail-header' }, [
     el('div', { class: 'task-detail-head-row' }, [
       breadcrumb,
-      el('span', { class: `status-chip ${issue.status}` }, [
-        el('span', { class: 'sdot' }),
+      el('span', { class: `status-chip ${issue.status}`, style: issueCs.chip || {} }, [
+        el('span', { class: 'sdot', style: issueCs.sdot || {} }),
         statusLabel(issue),
       ]),
     ]),
@@ -284,7 +301,7 @@ export function renderTaskDetailPanel({ issue, onClose, jiraUrl, onOpenEpic, onB
     el('div', { class: 'task-detail-comments-col' }, [commentsTitleEl, commentsBody]),
     el('div', { class: 'task-detail-history-col' }, [
       el('h3', { class: 'task-detail-section-title' }, [t('task.history')]),
-      statusTimeline(issue),
+      statusTimeline(issue, colorMap),
     ]),
   ]);
 

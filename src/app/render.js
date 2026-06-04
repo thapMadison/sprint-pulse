@@ -26,6 +26,7 @@ import { renderDonut } from '../charts/donut.js';
 import { renderEpicRoadmap } from '../charts/epic-roadmap.js';
 
 import { getState, activeSprint, DEFAULT_EPIC_FILTERS, subscribeEpicRoadmap, consumeSuppressIntroAnim, consumeSuppressSprintAnim } from './state.js';
+import { resolveStatusColors } from '../domain/status-colors.js';
 // (subscribeView, subscribeError, subscribeTopbar wired in main.js — not needed here)
 import { t } from './i18n.js';
 import {
@@ -261,20 +262,13 @@ function renderChartTooltip(key) {
 }
 
 function renderStatusCard(sprint) {
-  const counts = { todo: 0, inprogress: 0, done: 0 };
-  const hours = { todo: 0, inprogress: 0, done: 0 };
-  for (const i of sprint.issues) {
-    counts[i.status]++;
-    hours[i.status] += i.originalEstimate;
-  }
+  const statuses = resolveStatusColors(sprint.issues, getState().statusColorMap);
   return el('div', { class: 'card' }, [
     el('h3', { class: 'card-title' }, [
       el('span', {}, [t('app.statusByCategory')]),
       el('span', { class: 'accent' }),
     ]),
-    renderDonut({
-      counts, hoursByStatus: hours, totalIssues: sprint.issues.length,
-    }),
+    renderDonut({ statuses, totalIssues: sprint.issues.length }),
   ]);
 }
 

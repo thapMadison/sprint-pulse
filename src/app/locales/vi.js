@@ -98,7 +98,7 @@ export default {
   // ── Shared / misc ─────────────────────────────────────────────────────────────
   'common.unknown': 'Không rõ',
   'common.goBack': 'Quay lại',
-  'panel.statusByCategory': 'Trạng thái theo nhóm',
+  'panel.statusByCategory': 'Issue theo trạng thái',
   'panel.closeDetails': 'Đóng chi tiết',
   'panel.detailsFor': 'Chi tiết cho {name}',
 
@@ -185,6 +185,9 @@ export default {
   'workload.filterTodo': 'Cần làm',
   'workload.filterInprogress': 'Đang làm',
   'workload.filterDone': 'Hoàn thành',
+  'workload.filterAllStatuses': 'Tất cả trạng thái',
+  'workload.filterNSelected': '{count} đã chọn',
+  'workload.filterClear': 'Xoá bộ lọc',
   'workload.search': 'Tìm tác vụ theo mã hoặc tóm tắt…',
   'workload.title': 'Báo cáo khối lượng công việc',
   'workload.subtitle': '{count} thành viên · bấm vào tác vụ để xem chi tiết',
@@ -296,7 +299,7 @@ export default {
   'tip.control.tip': 'Ngoại lệ không xấu — đó là chủ đề đáng để cùng thảo luận. Hãy hỏi: hạng mục này có quá lớn, có ai bị kẹt, hay ta ước tính sai? Dùng hiểu biết đó để cải thiện việc ước lượng.',
 
   // ── App shell / render layer ──────────────────────────────────────────────────
-  'app.statusByCategory': 'Trạng thái theo nhóm',
+  'app.statusByCategory': 'Issue theo trạng thái',
   'app.loadingSprint': 'Đang tải dữ liệu {name}…',
   'app.sprintFallback': 'sprint',
   'app.chartBurndown': 'Burndown',

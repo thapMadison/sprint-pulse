@@ -13,6 +13,7 @@ import {
   fetchSprintFromWorker, fetchSprintListFromWorker, fetchBoardFromWorker,
   fetchEpicsFromWorker, fetchEpicIssuesFromWorker, fetchIssueDetailFromWorker,
 } from '../services/jira-api.js';
+import { buildColorMapFromIssues } from '../domain/status-colors.js';
 import { setState, setStateSilent, setEpicRoadmapState, setEpicViewState, setSprintViewState, setLoadProgressState, setDataSourceState, setViewState, setErrorState, setTopbarState, getState, suppressIntroAnimOnce, suppressSprintAnimOnce, DEFAULT_EPIC_FILTERS } from './state.js';
 import { DEMO_EPICS } from '../data/demo.js';
 import { VIEW, SOURCE } from './constants.js';
@@ -209,6 +210,14 @@ async function loadSprintDetail(sprintId) {
       sp.id === sprintId ? populateSprintIssues({ ...sp, jiraId }, data.issues || []) : sp
     );
     setSprintViewState({ sprints: updated });
+
+    // Rebuild the colour map from all loaded sprint issues. This is the
+    // authoritative source for status→category on this specific board —
+    // the global /statuses API returns statuses from every Jira project and
+    // causes cross-project name collisions that corrupt colour assignments.
+    const allIssues = updated.flatMap((sp) => sp.issues || []);
+    if (allIssues.length) setStateSilent({ statusColorMap: buildColorMapFromIssues(allIssues) });
+
     // Cache the newly-loaded issues so re-selecting this sprint (or a page
     // refresh) doesn't re-fetch them.
     persistCurrent();
@@ -468,22 +477,31 @@ async function loadSingleEpic(epicKey) {
     const latest = getState();
     const epic = latest.epics.find((e) => e.key === epicKey);
 
+    let enrichedEpic;
     if (epic) {
       // Epic exists in list — enrich it. Preserve existing routing (roadmap only)
       // to keep behaviour identical; patchEpicInState would also check epicDetailId
       // but loadSingleEpic is typically triggered before the panel opens (epicDetailId
       // is null), so the outcome is the same. Documented here for future cleanup.
-      const enrichedEpic = enrichEpicWithDetail(epic, detailData, latest.today);
+      enrichedEpic = enrichEpicWithDetail(epic, detailData, latest.today);
       const updatedEpics = latest.epics.map((e) =>
         e.id === epic.id ? enrichedEpic : e
       );
       setEpicRoadmapState({ epics: updatedEpics });
     } else {
       // Epic not in list — build a new one from detail data
-      const enrichedEpic = buildEpicFromDetail(epicKey, detailData, latest.today);
+      enrichedEpic = buildEpicFromDetail(epicKey, detailData, latest.today);
       const updatedEpics = [...latest.epics, enrichedEpic];
       setEpicRoadmapState({ epics: updatedEpics });
     }
+
+    // Merge epic tasks into the colour map so statuses that only appear in
+    // historical sprints get the same colour across sprint and epic views.
+    const allIssues = [
+      ...getState().sprints.flatMap((sp) => sp.issues || []),
+      ...(enrichedEpic.tasks || []),
+    ];
+    if (allIssues.length) setStateSilent({ statusColorMap: buildColorMapFromIssues(allIssues) });
   } catch (e) {
     console.warn(`[Epic] single epic load failed for ${epicKey}:`, e);
   }
@@ -667,8 +685,7 @@ async function fetchAndApplyBoard(boardId, { extra = {}, keepActiveId = null } =
 
   localStorage.setItem(BOARD_ID_KEY, boardId);
   setProgress('fetch');
-  // Board name (for the label) + sprint list in parallel. Board name is
-  // best-effort; fall back to the id on failure.
+  // Board name is best-effort; fall back to id on failure.
   const [board, rawSprints] = await Promise.all([
     fetchBoardFromWorker(workerUrl, boardId).catch(() => null),
     fetchSprintListFromWorker(workerUrl, boardId),

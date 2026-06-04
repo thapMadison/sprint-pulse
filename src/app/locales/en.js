@@ -113,7 +113,7 @@ export default {
   // ── Shared / misc ─────────────────────────────────────────────────────────────
   'common.unknown': 'Unknown',
   'common.goBack': 'Go back',
-  'panel.statusByCategory': 'Status by Category',
+  'panel.statusByCategory': 'Issues by Status',
   'panel.closeDetails': 'Close details',
   'panel.detailsFor': 'Details for {name}',
 
@@ -202,6 +202,9 @@ export default {
   'workload.filterTodo': 'To Do',
   'workload.filterInprogress': 'In Progress',
   'workload.filterDone': 'Done',
+  'workload.filterAllStatuses': 'All statuses',
+  'workload.filterNSelected': '{count} selected',
+  'workload.filterClear': 'Clear',
   'workload.search': 'Search tasks by key or summary…',
   'workload.title': 'User Workload Report',
   'workload.subtitle': '{count} contributors · click a task for details',
@@ -315,7 +318,7 @@ export default {
   'tip.control.tip': 'Outliers are not bad — they are conversations. Ask: was this issue too large, was someone stuck, or did we underestimate? Use insights to improve sizing.',
 
   // ── App shell / render layer ──────────────────────────────────────────────────
-  'app.statusByCategory': 'Status by Category',
+  'app.statusByCategory': 'Issues by Status',
   'app.loadingSprint': 'Loading {name} data…',
   'app.sprintFallback': 'sprint',
   'app.chartBurndown': 'Burndown',

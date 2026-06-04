@@ -3,11 +3,19 @@ import { svg } from '../../charts/svg.js';
 import { statusLabel, jiraLink } from '../format.js';
 import { issueTypeIcon } from './issue-type-icon.js';
 import { t } from '../../app/i18n.js';
+import { getState } from '../../app/state.js';
+import { resolveStatusColors, effectiveColorMap } from '../../domain/status-colors.js';
 
-function renderIssueRow(iss, onOpen, jiraUrl) {
+function renderIssueRow(iss, onOpen, jiraUrl, colorMap) {
   const keyNode = jiraUrl
     ? jiraLink({ jiraUrl, key: iss.key, class: 'jira-key-link', stopClick: true })
     : el('span', {}, [iss.key]);
+  const chipColor = colorMap[iss.statusName] || null;
+  const chipStyle = chipColor ? {
+    background: `color-mix(in oklch, ${chipColor} 18%, transparent)`,
+    color: chipColor,
+  } : {};
+  const sdotStyle = chipColor ? { background: chipColor } : {};
   return el('div', { class: 'issue-row issue-row-clickable', onClick: () => onOpen(iss) }, [
     el('span', { class: 'key issue-key-cell' }, [
       issueTypeIcon(iss.type, { size: 16 }),
@@ -15,8 +23,8 @@ function renderIssueRow(iss, onOpen, jiraUrl) {
     ]),
     el('span', { class: 'summary' }, [iss.summary]),
     el('span', {}, [
-      el('span', { class: `status-chip ${iss.status}` }, [
-        el('span', { class: 'sdot' }),
+      el('span', { class: `status-chip ${iss.status}`, style: chipStyle }, [
+        el('span', { class: 'sdot', style: sdotStyle }),
         statusLabel(iss),
       ]),
     ]),
@@ -77,21 +85,111 @@ function issueMatches(iss, q) {
   return `${iss.key} ${iss.summary}`.toLowerCase().includes(q);
 }
 
-const STATUS_FILTER_OPTIONS = [
-  { value: 'all',        labelKey: 'workload.filterAll' },
-  { value: 'todo',       labelKey: 'workload.filterTodo' },
-  { value: 'inprogress', labelKey: 'workload.filterInprogress' },
-  { value: 'done',       labelKey: 'workload.filterDone' },
-];
+function chevronSvg() {
+  return svg('svg', { width: 10, height: 10, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 2.5 }, [
+    svg('polyline', { points: '6 9 12 15 18 9' }),
+  ]);
+}
 
-function renderStatusFilterBtns(current, onChange) {
-  return STATUS_FILTER_OPTIONS.map((opt) =>
-    el('button', {
-      class: `roadmap-filter-chip ${current === opt.value ? 'active' : ''}`,
-      type: 'button',
-      onClick: () => onChange(opt.value),
-    }, [t(opt.labelKey)])
-  );
+function checkmarkSvg() {
+  return svg('svg', {
+    width: 10, height: 10, viewBox: '0 0 10 10',
+    fill: 'none', stroke: 'white', 'stroke-width': 1.8,
+    'stroke-linecap': 'round', 'stroke-linejoin': 'round',
+  }, [svg('polyline', { points: '1.5 5.2 3.8 7.5 8.5 2' })]);
+}
+
+function buildStatusDropdown(slices, onFilterChange) {
+  let selectedStatuses = new Set();
+  let isOpen = false;
+
+  const labelSpan = el('span', {}, [t('workload.filterAllStatuses')]);
+  const chevron = el('span', { class: 'wl-status-chevron' }, []);
+  chevron.appendChild(chevronSvg());
+
+  const btn = el('button', { class: 'wl-status-btn', type: 'button', 'aria-expanded': 'false' }, [labelSpan, chevron]);
+
+  function getBtnLabel(set) {
+    if (set.size === 0) return t('workload.filterAllStatuses');
+    if (set.size === 1) return [...set][0];
+    return t('workload.filterNSelected', { count: set.size });
+  }
+
+  function updateBtn(set) {
+    labelSpan.textContent = getBtnLabel(set);
+    btn.classList.toggle('active', set.size > 0);
+    btn.setAttribute('aria-expanded', String(isOpen));
+    clearBtn.style.display = set.size > 0 ? '' : 'none';
+  }
+
+  // Build item elements
+  const itemEls = slices.map(({ label, color, count }) => {
+    const checkEl = el('span', { class: 'wl-status-check' });
+    const dotEl = el('span', { class: 'wl-status-dot', style: { background: color } });
+    const nameEl = el('span', { class: 'wl-status-name' }, [label]);
+    const countEl = el('span', { class: 'wl-status-count' }, [String(count)]);
+    const item = el('div', { class: 'wl-status-item', role: 'checkbox', 'aria-checked': 'false' }, [
+      checkEl, dotEl, nameEl, countEl,
+    ]);
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const newSet = new Set(selectedStatuses);
+      const checked = !newSet.has(label);
+      if (checked) { newSet.add(label); checkEl.appendChild(checkmarkSvg()); }
+      else { newSet.delete(label); checkEl.innerHTML = ''; }
+      selectedStatuses = newSet;
+      item.classList.toggle('checked', checked);
+      item.setAttribute('aria-checked', String(checked));
+      updateBtn(newSet);
+      onFilterChange(newSet);
+    });
+    return { item, checkEl, label };
+  });
+
+  const clearBtn = el('button', { class: 'wl-status-clear', type: 'button' }, [t('workload.filterClear')]);
+  clearBtn.style.display = 'none';
+  clearBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    selectedStatuses = new Set();
+    itemEls.forEach(({ item, checkEl }) => {
+      item.classList.remove('checked');
+      item.setAttribute('aria-checked', 'false');
+      checkEl.innerHTML = '';
+    });
+    updateBtn(selectedStatuses);
+    onFilterChange(selectedStatuses);
+    close();
+  });
+
+  const dropdown = el('div', { class: 'wl-status-dropdown' }, [
+    ...itemEls.map(({ item }) => item),
+    el('div', { class: 'wl-status-divider' }),
+    clearBtn,
+  ]);
+
+  function close() {
+    isOpen = false;
+    dropdown.classList.remove('open');
+    btn.setAttribute('aria-expanded', 'false');
+  }
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    isOpen = !isOpen;
+    dropdown.classList.toggle('open', isOpen);
+    btn.setAttribute('aria-expanded', String(isOpen));
+  });
+
+  const wrap = el('div', { class: 'wl-status-filter' }, [btn, dropdown]);
+
+  // Close on outside click; self-clean when element is removed from DOM.
+  function outsideClick() {
+    if (!wrap.isConnected) { document.removeEventListener('click', outsideClick); return; }
+    if (isOpen) close();
+  }
+  document.addEventListener('click', outsideClick);
+
+  return wrap;
 }
 
 function chevronCell() {
@@ -127,9 +225,10 @@ function searchIcon() {
 
 export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
   const allRows = groupByUser(sprint.issues);
+  const colorMap = effectiveColorMap(getState().statusColorMap, sprint.issues);
   let expandedUserId = null;
   let query = '';
-  let statusFilter = 'all';
+  let selectedStatuses = new Set();
 
   const tbody = el('tbody', {}, []);
 
@@ -139,20 +238,23 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
     // When searching, only show users with ≥1 matching task, auto-expand them,
     // and list only the matching tasks inside.
     const searching = query.length > 0;
-    const filtering = statusFilter !== 'all';
+    const filtering = selectedStatuses.size > 0;
 
     for (const row of allRows) {
       let matchingIssues = row.issues;
-      if (filtering) matchingIssues = matchingIssues.filter((i) => i.status === statusFilter);
+      if (filtering) matchingIssues = matchingIssues.filter((i) => selectedStatuses.has(i.statusName || i.status));
       if (searching) matchingIssues = matchingIssues.filter((i) => issueMatches(i, query));
       if ((searching || filtering) && matchingIssues.length === 0) continue;
 
       const totalCt = row.issues.length || 1;
-      const segDone = (row.counts.done / totalCt) * 100;
-      const segInProg = (row.counts.inprogress / totalCt) * 100;
-      const segTodo = (row.counts.todo / totalCt) * 100;
       // While searching or filtering, every shown user is auto-expanded; otherwise honour the click state.
       const isOpen = (searching || filtering) ? true : expandedUserId === row.user.id;
+
+      const slices = resolveStatusColors(row.issues, colorMap);
+      const hbarSegs = slices.map(({ color, count }) =>
+        el('span', { style: { width: `${(count / totalCt) * 100}%`, background: color } })
+      );
+      // Numeric summary stays as done / inprogress / todo category totals.
 
       const tr = el('tr', {
         class: isOpen ? 'expanded' : '',
@@ -180,11 +282,7 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
         ]),
         el('td', {}, [
           el('div', { class: 'hbar-row' }, [
-            el('div', { class: 'hbar' }, [
-              el('span', { class: 'seg-done', style: { width: `${segDone}%` } }),
-              el('span', { class: 'seg-inprog', style: { width: `${segInProg}%` } }),
-              el('span', { class: 'seg-todo', style: { width: `${segTodo}%` } }),
-            ]),
+            el('div', { class: 'hbar' }, hbarSegs),
             el('span', { class: 'num', style: { fontSize: '11px' } }, [
               el('span', { style: { color: 'var(--lime)' } }, [String(row.counts.done)]),
               ' / ',
@@ -206,7 +304,7 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
           el('td', { colSpan: 6 }, [
             el('div', { class: 'issue-list' }, [
               renderIssueListHeader(),
-              ...matchingIssues.map((iss) => renderIssueRow(iss, () => onOpenTask?.(iss), jiraUrl)),
+              ...matchingIssues.map((iss) => renderIssueRow(iss, () => onOpenTask?.(iss), jiraUrl, colorMap)),
             ]),
           ]),
         ]));
@@ -234,23 +332,19 @@ export function renderWorkloadTable({ sprint, jiraUrl, onOpenTask }) {
   });
   const searchWrap = el('div', { class: 'workload-search roadmap-filter-search-wrap' }, [searchIcon(), searchInput]);
 
-  const chipsWrap = el('div', { class: 'roadmap-filter-chips' }, []);
+  // Build dropdown from all sprint issues (not filtered) so all statuses are visible.
+  const allSlices = resolveStatusColors(sprint.issues, colorMap);
+  const statusDropdown = buildStatusDropdown(allSlices, (newSet) => {
+    selectedStatuses = newSet;
+    renderBody();
+  });
 
-  function renderFilterBar() {
-    chipsWrap.innerHTML = '';
-    renderStatusFilterBtns(statusFilter, (val) => {
-      statusFilter = val;
-      renderFilterBar();
-      renderBody();
-    }).forEach((btn) => chipsWrap.appendChild(btn));
-  }
-  renderFilterBar();
   renderBody();
 
   const filterBar = el('div', { class: 'workload-filter-bar' }, [
     el('div', { class: 'roadmap-filter-group' }, [
       el('span', { class: 'roadmap-filter-label' }, [t('workload.filterLabel')]),
-      chipsWrap,
+      statusDropdown,
     ]),
     searchWrap,
   ]);

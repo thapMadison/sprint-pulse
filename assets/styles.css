@@ -326,7 +326,7 @@ body {
 /* ============ Sprint info row ============ */
 .sprint-hero {
   display: grid;
-  grid-template-columns: 0.85fr 0.95fr 1.25fr;
+  grid-template-columns: 0.85fr 0.78fr 1.37fr;
   gap: 14px;
   margin-bottom: 16px;
   align-items: stretch;
@@ -578,6 +578,37 @@ body {
 .sprint-hero .donut-legend-row:not(:last-child) {
   border-bottom: 1px dashed var(--border);
 }
+
+/* Compact 2-column layout when many statuses (>5) */
+.sprint-hero .donut-wrap:has(.donut-legend--many) { align-items: flex-start; }
+.sprint-hero .donut-wrap:has(.donut-legend--many) svg { width: 160px; height: 160px; }
+.sprint-hero .donut-legend--many {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 10px;
+  align-content: start;
+}
+.sprint-hero .donut-legend--many .donut-legend-row {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 4px 0 5px;
+  font-size: 11px;
+  border-bottom: none;
+}
+.sprint-hero .donut-legend--many .donut-legend-row:not(:last-child) { border-bottom: none; }
+.sprint-hero .donut-legend--many .donut-legend-row .left { gap: 5px; width: 100%; overflow: hidden; }
+.sprint-hero .donut-legend--many .donut-legend-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+.sprint-hero .donut-legend--many .donut-legend-row .right {
+  padding-left: 15px; /* swatch(10px) + gap(5px) */
+  font-size: 11px;
+}
+
 .donut-center-val {
   font-family: var(--font-display);
   font-size: 28px;
@@ -866,7 +897,13 @@ body {
   .row.cols-3 { grid-template-columns: 1fr; }
   .row.cols-2 { grid-template-columns: 1fr; }
 
-  .sprint-hero .donut-wrap svg { width: 150px; height: 150px; }
+  /* Stack donut vertically: SVG centred, legend full-width below */
+  .sprint-hero .donut-wrap,
+  .sprint-hero .donut-wrap:has(.donut-legend--many) { flex-direction: column; align-items: center; gap: 14px; }
+  .sprint-hero .donut-wrap svg,
+  .sprint-hero .donut-wrap:has(.donut-legend--many) svg { width: 140px; height: 140px; }
+  .sprint-hero .donut-legend,
+  .sprint-hero .donut-legend--many { width: 100%; }
 
   .format-panel { grid-template-columns: 1fr 1fr; }
 
@@ -890,7 +927,8 @@ body {
 
   .stat-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
 
-  .sprint-hero .donut-wrap svg { width: 120px; height: 120px; }
+  .sprint-hero .donut-wrap svg,
+  .sprint-hero .donut-wrap:has(.donut-legend--many) svg { width: 120px; height: 120px; }
   .donut-center-val { font-size: 22px; }
 
   .format-panel { grid-template-columns: 1fr; }

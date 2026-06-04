@@ -14,34 +14,27 @@ function describeArc(cx, cy, r, startAngle, endAngle) {
   return ['M', start.x, start.y, 'A', r, r, 0, largeArc, 0, end.x, end.y].join(' ');
 }
 
-const ORDER = ['done', 'inprogress', 'todo'];
-const COLORS = {
-  done: 'var(--lime)',
-  inprogress: 'var(--amber)',
-  todo: 'oklch(0.45 0.02 270)',
-};
-const LABELS = { done: 'chart.donut.done', inprogress: 'chart.donut.inprogress', todo: 'chart.donut.todo' };
-
-export function renderDonut({ counts, hoursByStatus, totalIssues }) {
+// statuses: [{ label, color, count, hours }, ...] — ordered by caller
+export function renderDonut({ statuses, totalIssues }) {
   const size = 200, stroke = 22, r = (size - stroke) / 2;
   const cx = size / 2, cy = size / 2;
 
-  const total = ORDER.reduce((s, k) => s + counts[k], 0);
+  const total = statuses.reduce((s, e) => s + e.count, 0);
   let startAngle = 0;
   const segs = [];
-  for (const k of ORDER) {
-    const pct = total ? counts[k] / total : 0;
+  for (const { color, count } of statuses) {
+    const pct = total ? count / total : 0;
     if (pct === 0) continue;
     const sweepAngle = pct * 360;
     const endAngle = startAngle + sweepAngle;
     if (pct >= 0.9999) {
       segs.push(svg('circle', {
-        cx, cy, r, fill: 'none', stroke: COLORS[k], 'stroke-width': stroke,
+        cx, cy, r, fill: 'none', stroke: color, 'stroke-width': stroke,
       }));
     } else {
       segs.push(svg('path', {
         d: describeArc(cx, cy, r, startAngle, endAngle - 0.5),
-        fill: 'none', stroke: COLORS[k], 'stroke-width': stroke, 'stroke-linecap': 'butt',
+        fill: 'none', stroke: color, 'stroke-width': stroke, 'stroke-linecap': 'butt',
       }));
     }
     startAngle = endAngle;
@@ -82,21 +75,22 @@ export function renderDonut({ counts, hoursByStatus, totalIssues }) {
     [defs, baseCircle, segGroup, centerVal, centerLbl]
   );
 
-  const legendRows = ORDER.map((k) =>
+  const legendRows = statuses.map(({ label, color, count, hours }) =>
     el('div', { class: 'donut-legend-row' }, [
       el('div', { class: 'left' }, [
-        el('span', { class: 'sw', style: { background: COLORS[k] } }),
-        el('span', {}, [t(LABELS[k])]),
+        el('span', { class: 'sw', style: { background: color } }),
+        el('span', { class: 'donut-legend-label' }, [label]),
       ]),
       el('div', { class: 'right' }, [
-        el('span', { class: 'big' }, [String(counts[k])]),
-        el('span', { style: { color: 'var(--ink-3)' } }, [` · ${hoursByStatus[k].toFixed(1)}h`]),
+        el('span', { class: 'big' }, [String(count)]),
+        el('span', { style: { color: 'var(--ink-3)' } }, [` · ${hours.toFixed(1)}h`]),
       ]),
     ])
   );
 
+  const legendClass = statuses.length > 5 ? 'donut-legend donut-legend--many' : 'donut-legend';
   return el('div', { class: 'donut-wrap' }, [
     svgEl,
-    el('div', { class: 'donut-legend' }, legendRows),
+    el('div', { class: legendClass }, legendRows),
   ]);
 }
