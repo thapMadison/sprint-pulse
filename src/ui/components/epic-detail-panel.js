@@ -4,18 +4,18 @@ import { renderEpicTasksTable } from './epic-tasks-table.js';
 import { renderDonut } from '../../charts/donut.js';
 import { renderPanelShell } from './panel-shell.js';
 import { t } from '../../app/i18n.js';
+import { getState } from '../../app/state.js';
+import { resolveStatusColors } from '../../domain/status-colors.js';
 
 function donutCard(epic) {
+  const tasks = epic.tasks || [];
+  const statuses = resolveStatusColors(tasks, getState().statusColorMap);
   return el('div', { class: 'card' }, [
     el('h3', { class: 'card-title' }, [
       el('span', {}, [t('panel.statusByCategory')]),
       el('span', { class: 'accent' }),
     ]),
-    renderDonut({
-      counts: epic.progress.counts,
-      hoursByStatus: epic.progress.hours,
-      totalIssues: epic.progress.totalIssues,
-    }),
+    renderDonut({ statuses, totalIssues: epic.progress.totalIssues }),
   ]);
 }
 

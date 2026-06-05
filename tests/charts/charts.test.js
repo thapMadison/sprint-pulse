@@ -30,8 +30,12 @@ describe('chart renderers (golden master DOM)', () => {
 
   it('renderDonut', () => {
     const donut = renderDonut({
-      counts: { todo: 3, inprogress: 5, done: 7 },
-      hoursByStatus: { todo: 10, inprogress: 20.5, done: 30 },
+      statuses: [
+        { label: 'Done', color: 'oklch(0.81 0.155 130)', count: 7, hours: 30 },
+        { label: 'In Review', color: 'oklch(0.80 0.135 75)', count: 3, hours: 12 },
+        { label: 'In Progress', color: 'oklch(0.73 0.14 60)', count: 2, hours: 8.5 },
+        { label: 'To Do', color: 'oklch(0.50 0.02 270)', count: 3, hours: 10 },
+      ],
       totalIssues: 15,
     });
     expect(donut.outerHTML).toMatchSnapshot();

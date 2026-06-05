@@ -4,6 +4,8 @@ import { issueTypeIcon } from './issue-type-icon.js';
 import { renderUserCell } from './user-cell.js';
 import { STATUS_ORDER } from '../../app/constants.js';
 import { t } from '../../app/i18n.js';
+import { getState } from '../../app/state.js';
+import { effectiveColorMap } from '../../domain/status-colors.js';
 
 export function renderEpicTasksTable({ epic, jiraUrl, onOpenTask }) {
   if (!epic || !epic.tasks.length) {
@@ -22,12 +24,19 @@ export function renderEpicTasksTable({ epic, jiraUrl, onOpenTask }) {
     return a.key.localeCompare(b.key);
   });
 
+  const colorMap = effectiveColorMap(getState().statusColorMap, epic.tasks);
   const rows = tasks.map((task) => {
     const assignee = task.assignee || { color: 'var(--ink-3)', initials: '?', name: t('task.unassigned') };
     const keyNode = jiraUrl
       ? jiraLink({ jiraUrl, key: task.key, class: 'mono-key jira-key-link', stopClick: true })
       : el('span', { class: 'mono-key' }, [task.key]);
     const trAttrs = onOpenTask ? { class: 'epic-task-clickable', onClick: () => onOpenTask(task) } : {};
+    const chipColor = colorMap[task.statusName] || null;
+    const chipStyle = chipColor ? {
+      background: `color-mix(in oklch, ${chipColor} 18%, transparent)`,
+      color: chipColor,
+    } : {};
+    const sdotStyle = chipColor ? { background: chipColor } : {};
     return el('tr', trAttrs, [
     el('td', {}, [el('span', { class: 'issue-key-cell' }, [
       issueTypeIcon(task.type, { size: 16 }),
@@ -39,8 +48,8 @@ export function renderEpicTasksTable({ epic, jiraUrl, onOpenTask }) {
     ])]),
     el('td', {}, [renderUserCell(assignee)]),
     el('td', {}, [
-      el('span', { class: `status-chip ${task.status}` }, [
-        el('span', { class: 'sdot' }),
+      el('span', { class: `status-chip ${task.status}`, style: chipStyle }, [
+        el('span', { class: 'sdot', style: sdotStyle }),
         statusLabel(task),
       ]),
     ]),

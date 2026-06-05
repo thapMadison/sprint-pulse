@@ -44,6 +44,8 @@ const state = {
   epics: [],
   epicLoadProgress: null,
   epicError: null,
+  // Board-wide status→colour map (populated on API load; {} for demo/file mode)
+  statusColorMap: {},
   // Roadmap UI state
   expandedEpicIds: new Set(),
   epicDetailId: null,

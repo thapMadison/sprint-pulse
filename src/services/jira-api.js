@@ -28,6 +28,13 @@ export async function fetchSprintListFromWorker(workerUrl, boardId) {
   return workerGet(workerUrl, `/sprints?boardId=${encodeURIComponent(boardId)}`);
 }
 
+// Fetch the board's project workflow status list ([{ id, name, categoryKey }]).
+// Authoritative source for the board-wide status→colour map; returns [] for
+// boards without a single projectKey (caller falls back to issue-derived colours).
+export async function fetchStatusesFromWorker(workerUrl, boardId) {
+  return workerGet(workerUrl, `/statuses?boardId=${encodeURIComponent(boardId)}`);
+}
+
 // Fetch board metadata (name/type) for display labels.
 export async function fetchBoardFromWorker(workerUrl, boardId) {
   return workerGet(workerUrl, `/board?boardId=${encodeURIComponent(boardId)}`);

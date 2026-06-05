@@ -79,28 +79,49 @@ export default {
         return json(data.values || [], 200, cors);
       }
 
+      // GET /statuses - Full project workflow status list with categories. Lets the
+      // client build an authoritative board-wide status→colour map (buildStatusColorMap)
+      // instead of inferring categories from whichever statuses happen to be current.
+      // Returns [] for boards without a single projectKey (client falls back to issues).
+      if (path === '/statuses') {
+        const maps = await fetchProjectStatusMaps(env, headers, boardId);
+        // ?debug=1 surfaces the resolved projectKey + count for diagnosing empty results.
+        if (url.searchParams.get('debug')) {
+          return json({ projectKey: maps.projectKey, count: maps.list.length, list: maps.list }, 200, cors);
+        }
+        return json(maps.list, 200, cors);
+      }
+
       // GET /sprint/:id - Get issues for a specific sprint
       const sprintMatch = path.match(/^\/sprint\/(\d+)$/);
       if (sprintMatch) {
         const sprintId = sprintMatch[1];
 
-        const [sprintInfo, issuesData] = await Promise.all([
+        const [sprintInfo, issuesData, workflowMaps] = await Promise.all([
           jiraFetch(`${env.JIRA_BASE_URL}/rest/agile/1.0/sprint/${sprintId}`, headers),
           jiraFetch(
-            `${env.JIRA_BASE_URL}/rest/agile/1.0/sprint/${sprintId}/issue?fields=summary,status,assignee,timetracking,issuetype,priority,created,parent&expand=changelog&maxResults=200`,
+            `${env.JIRA_BASE_URL}/rest/agile/1.0/sprint/${sprintId}/issue?fields=summary,status,assignee,timetracking,issuetype,priority,created,updated,parent&expand=changelog&maxResults=200`,
             headers
           ),
+          fetchProjectStatusMaps(env, headers, boardId),
         ]);
 
         const rawIssues = issuesData.issues || [];
 
-        // Build name → statusCategory map from ALL current statuses of issues in this sprint.
-        // This covers every status currently in use in the workflow without an extra API call.
-        const statusCategoryByName = {};
+        // Authoritative name→category AND id→category maps. Base = the project's full
+        // workflow status list (covers history-only statuses no current issue holds),
+        // overlaid with current-issue statuses (also authoritative; guarantees each
+        // issue's live status is present even if the project list lagged). The id map
+        // resolves changelog transitions via item.from / item.to.
+        const statusCategoryByName = { ...workflowMaps.byName };
+        const statusCategoryById = { ...workflowMaps.byId };
         for (const iss of rawIssues) {
           const st = iss.fields?.status;
           if (st?.name && st?.statusCategory) {
             statusCategoryByName[st.name] = st.statusCategory;
+          }
+          if (st?.id && st?.statusCategory) {
+            statusCategoryById[String(st.id)] = st.statusCategory;
           }
         }
 
@@ -126,7 +147,7 @@ export default {
             sprintEndDate: sprintInfo.endDate?.slice(0, 10) || null,
             sprintState: (sprintInfo.state || '').toLowerCase(),
             sprintGoal: sprintInfo.goal || '',
-            statusChanges: extractStatusChanges(iss.changelog, f.created, status, statusCategoryByName),
+            statusChanges: extractStatusChanges(iss.changelog, f.created, f.updated, status, statusCategoryByName, statusCategoryById),
             epicKey: f.parent?.key || null,
             epicName: f.parent?.fields?.summary || null,
           };
@@ -273,21 +294,29 @@ export default {
           return json({ error: `Epic ${epicKey} not found` }, 404, cors);
         }
 
-        // Fetch all child issues with changelog
+        // Fetch all child issues with changelog + the project's full status list
+        // (authoritative category source for history-only statuses).
         const childJql = encodeURIComponent(`parent = ${epicKey} ORDER BY created ASC`);
-        const issuesData = await jiraFetch(
-          `${env.JIRA_BASE_URL}/rest/api/3/search/jql?jql=${childJql}&fields=summary,status,assignee,timetracking,issuetype,priority,created,customfield_10020&expand=changelog&maxResults=200`,
-          headers
-        );
+        const [issuesData, workflowMaps] = await Promise.all([
+          jiraFetch(
+            `${env.JIRA_BASE_URL}/rest/api/3/search/jql?jql=${childJql}&fields=summary,status,assignee,timetracking,issuetype,priority,created,updated,customfield_10020&expand=changelog&maxResults=200`,
+            headers
+          ),
+          fetchProjectStatusMaps(env, headers, boardId),
+        ]);
 
         const rawIssues = issuesData.issues || [];
 
-        // Build statusCategory map from all statuses in the result set
-        const statusCategoryByName = {};
+        // Authoritative maps: project workflow base, overlaid with current-issue statuses.
+        const statusCategoryByName = { ...workflowMaps.byName };
+        const statusCategoryById = { ...workflowMaps.byId };
         for (const iss of rawIssues) {
           const st = iss.fields?.status;
           if (st?.name && st?.statusCategory) {
             statusCategoryByName[st.name] = st.statusCategory;
+          }
+          if (st?.id && st?.statusCategory) {
+            statusCategoryById[String(st.id)] = st.statusCategory;
           }
         }
 
@@ -322,7 +351,7 @@ export default {
             sprintState: (activeSprint?.state || '').toLowerCase(),
             epicKey,
             epicName: epicIssue.fields?.summary || epicKey,
-            statusChanges: extractStatusChanges(iss.changelog, f.created, status, statusCategoryByName),
+            statusChanges: extractStatusChanges(iss.changelog, f.created, f.updated, status, statusCategoryByName, statusCategoryById),
           };
         });
 
@@ -394,7 +423,7 @@ export default {
         }, 200, cors);
       }
 
-      return json({ error: 'Not found. Use /board, /sprints, /sprint/:id, /all, /epics, /epic/:key, or /issue/:key' }, 404, cors);
+      return json({ error: 'Not found. Use /board, /sprints, /statuses, /sprint/:id, /all, /epics, /epic/:key, or /issue/:key' }, 404, cors);
 
     } catch (error) {
       return json({ error: error.message }, 500, cors);
@@ -409,6 +438,81 @@ async function jiraFetch(url, headers) {
     throw new Error(`Jira API ${res.status}: ${body.slice(0, 200)}`);
   }
   return res.json();
+}
+
+// Module-level cache of project status maps, keyed by projectKey. A Worker reuses
+// its isolate across requests, so this avoids re-fetching the (rarely-changing)
+// workflow status list on every sprint/epic request that lands on the same isolate.
+const PROJECT_STATUS_CACHE = new Map();
+
+// Resolve the board's project key/id. The agile "board" and "board configuration"
+// endpoints expose the project under different field names (board → location.projectKey,
+// configuration → location.key), so try both with several aliases. Returns null for
+// multi-project / JQL boards with no single project context.
+async function resolveBoardProjectKey(env, headers, boardId) {
+  const pick = (loc) =>
+    loc?.projectKey || loc?.key || loc?.projectId || loc?.id || null;
+
+  try {
+    const board = await jiraFetch(`${env.JIRA_BASE_URL}/rest/agile/1.0/board/${boardId}`, headers);
+    const k = pick(board?.location);
+    if (k) return String(k);
+  } catch { /* try configuration next */ }
+
+  try {
+    const cfg = await jiraFetch(`${env.JIRA_BASE_URL}/rest/agile/1.0/board/${boardId}/configuration`, headers);
+    const k = pick(cfg?.location);
+    if (k) return String(k);
+  } catch { /* give up */ }
+
+  return null;
+}
+
+// Resolve the board's project and fetch its full workflow status list so EVERY
+// status name/id (current OR history-only) maps to an authoritative Jira
+// statusCategory. Returns { byName, byId, list, projectKey }. On any failure (e.g. a
+// multi-project / JQL board with no single projectKey) returns empty maps, so the
+// caller falls back to current-issue-derived maps + the client name heuristic.
+async function fetchProjectStatusMaps(env, headers, boardId) {
+  const empty = { byName: {}, byId: {}, list: [], projectKey: null };
+
+  const projectKey = await resolveBoardProjectKey(env, headers, boardId);
+  if (!projectKey) return empty;
+
+  if (PROJECT_STATUS_CACHE.has(projectKey)) {
+    return PROJECT_STATUS_CACHE.get(projectKey);
+  }
+
+  let data;
+  try {
+    data = await jiraFetch(
+      `${env.JIRA_BASE_URL}/rest/api/3/project/${encodeURIComponent(projectKey)}/statuses`,
+      headers
+    );
+  } catch {
+    return { ...empty, projectKey };
+  }
+
+  // Shape: [{ id, name (issue type), statuses: [{ id, name, statusCategory }] }]
+  const byName = {};
+  const byId = {};
+  const seen = new Set();
+  const list = [];
+  for (const issueType of Array.isArray(data) ? data : []) {
+    for (const st of issueType.statuses || []) {
+      if (st?.name && st?.statusCategory) byName[st.name] = st.statusCategory;
+      if (st?.id && st?.statusCategory) byId[String(st.id)] = st.statusCategory;
+      const dedupKey = `${st?.id}|${st?.name}`;
+      if (st?.name && !seen.has(dedupKey)) {
+        seen.add(dedupKey);
+        list.push({ id: st.id || null, name: st.name, categoryKey: st.statusCategory?.key || 'new' });
+      }
+    }
+  }
+
+  const result = { byName, byId, list, projectKey };
+  PROJECT_STATUS_CACHE.set(projectKey, result);
+  return result;
 }
 
 function toHours(sec) {
@@ -465,60 +569,81 @@ function adfToText(node) {
   return lines.join('').replace(/\n{3,}/g, '\n\n').trim();
 }
 
-function statusWithCategory(name, map) {
-  const category = name && map ? map[name] : null;
-  return category ? { name, statusCategory: category } : { name };
+// Resolve a status object with its category. Tries name map first, then ID map
+// (for historical statuses no longer current on any issue), then falls back to
+// the name-heuristic in normalizeStatus on the client side.
+function statusWithCategory(name, id, nameMap, idMap) {
+  if (name && nameMap?.[name]) {
+    return { name, statusCategory: nameMap[name] };
+  }
+  const idKey = id != null ? String(id) : null;
+  if (idKey && idMap?.[idKey]) {
+    return { name, statusCategory: idMap[idKey] };
+  }
+  return { name };
 }
 
-function extractStatusChanges(changelog, createdDate, initialStatus, statusCategoryByName) {
+function extractStatusChanges(changelog, createdDate, updatedDate, initialStatus, statusCategoryByName, statusCategoryById) {
   const changes = [];
 
+  // Sort histories ascending by full timestamp so same-day entries stay in
+  // chronological order after the final sort-by-date below.
+  const sortedHistories = changelog?.histories
+    ? [...changelog.histories].sort((a, b) => (a.created || '').localeCompare(b.created || ''))
+    : [];
+
   // Find the FIRST status change to know what the issue was created as.
-  // If there's any 'status' change in history, the earliest from-status is the initial.
   let firstChange = null;
-  if (changelog && changelog.histories) {
-    const sorted = [...changelog.histories].sort((a, b) =>
-      (a.created || '').localeCompare(b.created || '')
-    );
-    for (const h of sorted) {
-      for (const item of h.items || []) {
-        if (item.field === 'status') {
-          firstChange = item;
-          break;
-        }
-      }
-      if (firstChange) break;
+  for (const h of sortedHistories) {
+    for (const item of h.items || []) {
+      if (item.field === 'status') { firstChange = item; break; }
     }
+    if (firstChange) break;
   }
 
   // Add initial status when issue was created
   if (createdDate) {
     const initName = firstChange ? firstChange.fromString : (initialStatus?.name || 'To Do');
+    const initId = firstChange ? firstChange.from : (initialStatus?.id ?? null);
     changes.push({
       date: createdDate.slice(0, 10),
-      toStatus: statusWithCategory(initName, statusCategoryByName),
+      toStatus: statusWithCategory(initName, initId, statusCategoryByName, statusCategoryById),
     });
   }
 
-  if (changelog && changelog.histories) {
-    for (const history of changelog.histories) {
-      const date = history.created?.slice(0, 10);
-      if (!date) continue;
-
-      for (const item of history.items || []) {
-        if (item.field === 'status') {
-          changes.push({
-            date,
-            fromStatus: item.fromString ? statusWithCategory(item.fromString, statusCategoryByName) : null,
-            toStatus: statusWithCategory(item.toString, statusCategoryByName),
-          });
-        }
+  for (const history of sortedHistories) {
+    const date = history.created?.slice(0, 10);
+    if (!date) continue;
+    for (const item of history.items || []) {
+      if (item.field === 'status') {
+        changes.push({
+          date,
+          fromStatus: item.fromString
+            ? statusWithCategory(item.fromString, item.from, statusCategoryByName, statusCategoryById)
+            : null,
+          toStatus: statusWithCategory(item.toString, item.to, statusCategoryByName, statusCategoryById),
+        });
       }
     }
   }
 
-  // Sort by date
+  // Sort by date (stable — same-day order preserved from sortedHistories above)
   changes.sort((a, b) => a.date.localeCompare(b.date));
+
+  // If Jira's changelog is truncated the last recorded transition may not match
+  // the issue's current status. Add a synthetic entry so the history panel and
+  // chart logic see the real current state.
+  const lastEntry = changes[changes.length - 1];
+  const currentName = initialStatus?.name;
+  if (currentName && lastEntry && lastEntry.toStatus?.name !== currentName) {
+    const syntheticDate = updatedDate ? updatedDate.slice(0, 10) : lastEntry.date;
+    changes.push({
+      date: syntheticDate,
+      toStatus: statusWithCategory(currentName, initialStatus?.id ?? null, statusCategoryByName, statusCategoryById),
+    });
+    changes.sort((a, b) => a.date.localeCompare(b.date));
+  }
+
   return changes;
 }
 

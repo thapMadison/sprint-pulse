@@ -2963,13 +2963,20 @@ html.theme-light {
 }
 
 /* ============================================================
-   Workload Report — task search box
+   Workload Report — status filter + search box (single row)
    ============================================================ */
+.workload-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
 .workload-search {
   position: relative;
   display: flex;
   align-items: center;
-  margin: 4px 0 14px;
 }
 .workload-search-icon {
   position: absolute;
@@ -3000,6 +3007,130 @@ html.theme-light {
 .issue-row-clickable { cursor: pointer; border-radius: 8px; transition: background 0.14s ease; }
 .issue-row-clickable:hover { background: oklch(1 0 0 / 0.05); }
 .theme-light .issue-row-clickable:hover { background: oklch(0.2 0.01 270 / 0.05); }
+
+/* Workload status multi-select dropdown */
+.wl-status-filter { position: relative; }
+.wl-status-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 6px 12px;
+  color: var(--ink-3);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.wl-status-btn:hover { color: var(--ink-2); }
+.wl-status-btn.active {
+  background: oklch(0.7 0.18 295 / 0.18);
+  color: var(--ink);
+  font-weight: 600;
+}
+.wl-status-chevron { display: flex; align-items: center; opacity: 0.6; transition: transform 0.15s ease; }
+.wl-status-btn[aria-expanded="true"] .wl-status-chevron { transform: rotate(180deg); }
+.wl-status-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 210px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: var(--card-solid);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 4px;
+  z-index: 200;
+  box-shadow: 0 12px 32px oklch(0 0 0 / 0.4);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px);
+  transition: opacity 0.13s ease, transform 0.13s ease, visibility 0s linear 0.13s;
+}
+.wl-status-dropdown.open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition: opacity 0.13s ease, transform 0.13s ease;
+}
+.wl-status-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ink-2);
+  user-select: none;
+}
+.wl-status-item:hover { background: oklch(1 0 0 / 0.06); color: var(--ink); }
+.wl-status-item.checked { color: var(--ink); }
+.wl-status-check {
+  width: 14px; height: 14px;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 3px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wl-status-item.checked .wl-status-check {
+  background: var(--violet);
+  border-color: var(--violet);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wl-status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.wl-status-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wl-status-count { font-family: var(--font-mono); font-size: 11px; color: var(--ink-3); flex-shrink: 0; }
+.wl-status-divider { height: 1px; background: var(--border); margin: 4px 0; }
+.wl-status-clear {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--coral);
+  cursor: pointer;
+  padding: 6px 10px;
+  text-align: left;
+  border-radius: 5px;
+}
+.wl-status-clear:hover { background: oklch(1 0 0 / 0.06); }
+.theme-light .wl-status-btn {
+  background: oklch(0.2 0.01 270 / 0.06);
+  border: 1px solid oklch(0.2 0.01 270 / 0.14);
+  color: oklch(0.4 0.01 270);
+}
+.theme-light .wl-status-btn:hover {
+  background: oklch(0.2 0.01 270 / 0.10);
+  color: oklch(0.2 0.01 270);
+}
+.theme-light .wl-status-btn.active {
+  background: oklch(0.7 0.18 295 / 0.10);
+  border-color: oklch(0.7 0.18 295 / 0.3);
+  color: oklch(0.45 0.18 295);
+}
+.theme-light .wl-status-dropdown {
+  background: oklch(1 0 0);
+  border-color: oklch(0.2 0.01 270 / 0.12);
+  box-shadow: 0 8px 24px oklch(0 0 0 / 0.10), 0 2px 6px oklch(0 0 0 / 0.06);
+}
+.theme-light .wl-status-item { color: oklch(0.38 0.01 270); }
+.theme-light .wl-status-item:hover { background: oklch(0.2 0.01 270 / 0.05); color: oklch(0.2 0.01 270); }
+.theme-light .wl-status-item.checked { color: oklch(0.2 0.01 270); }
+.theme-light .wl-status-check { border-color: oklch(0.2 0.01 270 / 0.25); }
+.theme-light .wl-status-count { color: oklch(0.55 0.01 270); }
+.theme-light .wl-status-divider { background: oklch(0.2 0.01 270 / 0.08); }
+.theme-light .wl-status-clear { color: oklch(0.5 0.18 25); }
+.theme-light .wl-status-clear:hover { background: oklch(0.2 0.01 270 / 0.05); }
 
 /* ============================================================
    Task Detail panel (reuses .epic-detail-* overlay/backdrop/close)
