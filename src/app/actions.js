@@ -19,6 +19,7 @@ import { setState, setStateSilent, setEpicRoadmapState, setEpicViewState, setSpr
 import { DEMO_EPICS } from '../data/demo.js';
 import { VIEW, SOURCE } from './constants.js';
 import { startAutoRefresh, stopAutoRefresh } from './auto-refresh.js';
+import { refreshLog } from './debug.js';
 import { setActiveLang, isSupported, LANG_STORAGE_KEY, t } from './i18n.js';
 import { setActiveTheme, isSupportedTheme, applyTheme, THEME_STORAGE_KEY } from './theme.js';
 
@@ -853,24 +854,24 @@ function epicChanged(prev, next) {
 export async function silentRefresh() {
   const s = getState();
   if (s.sourceKey !== SOURCE.API) {
-    console.log('[AutoRefresh] silentRefresh skipped — not API source:', s.sourceKey);
+    refreshLog('[AutoRefresh] silentRefresh skipped — not API source:', s.sourceKey);
     return;
   }
   if (s.isRefreshing || s.loadProgress || s.epicLoadProgress) {
-    console.log('[AutoRefresh] silentRefresh skipped — manual refresh/load in progress');
+    refreshLog('[AutoRefresh] silentRefresh skipped — manual refresh/load in progress');
     return;
   }
   if (!isAuthenticated()) {
-    console.log('[AutoRefresh] silentRefresh skipped — not authenticated');
+    refreshLog('[AutoRefresh] silentRefresh skipped — not authenticated');
     return;
   }
   if (!localStorage.getItem(BOARD_ID_KEY)) {
-    console.log('[AutoRefresh] silentRefresh skipped — no boardId');
+    refreshLog('[AutoRefresh] silentRefresh skipped — no boardId');
     return;
   }
 
   _silentCycle++;
-  console.log(`[AutoRefresh] silentRefresh cycle #${_silentCycle} (view: ${s.view})`);
+  refreshLog(`[AutoRefresh] silentRefresh cycle #${_silentCycle} (view: ${s.view})`);
   await refreshSprintsOnly();  // top-level fetch errors propagate → auto-refresh backs off
   await refreshEpicsOnly();    // no-op unless on the Epic tab
 
@@ -881,7 +882,7 @@ export async function silentRefresh() {
   setStateSilent({ lastUpdated: new Date() });
   persistCurrent();   // save updated timestamp to cache so F5 restore shows correct age
   setDataSourceState({});
-  console.log('[AutoRefresh] timestamp bumped → "Updated just now"');
+  refreshLog('[AutoRefresh] timestamp bumped → "Updated just now"');
 }
 
 async function refreshSprintsOnly() {
@@ -889,13 +890,13 @@ async function refreshSprintsOnly() {
   if (!ctx) return;
   const { workerUrl, boardId } = ctx;
 
-  console.log('[AutoRefresh] fetching sprint list...');
+  refreshLog('[AutoRefresh] fetching sprint list...');
   const rawSprints = await fetchSprintListFromWorker(workerUrl, boardId);
   if (!rawSprints || !rawSprints.length) {
-    console.log('[AutoRefresh] sprint list empty — skipping');
+    refreshLog('[AutoRefresh] sprint list empty — skipping');
     return;
   }
-  console.log(`[AutoRefresh] sprint list ok (${rawSprints.length} sprints)`);
+  refreshLog(`[AutoRefresh] sprint list ok (${rawSprints.length} sprints)`);
 
   const old = getState().sprints;
   // Rebuild shells from the fresh list, but carry over already-loaded issues for
@@ -912,36 +913,36 @@ async function refreshSprintsOnly() {
   // Re-fetch issues for the sprint the user is actually looking at.
   const activeId = getState().activeSprintId;
   const activeSprint = merged.find((sp) => sp.id === activeId);
-  console.log(`[AutoRefresh] fetching active sprint issues (${activeSprint?.name || activeId})...`);
+  refreshLog(`[AutoRefresh] fetching active sprint issues (${activeSprint?.name || activeId})...`);
   const i = merged.findIndex((sp) => sp.id === activeId);
   if (i >= 0 && merged[i].jiraId) {
     try {
       const data = await fetchSprintFromWorker(workerUrl, merged[i].jiraId, boardId);
       merged[i] = populateSprintIssues(merged[i], data.issues || []);
-      console.log(`[AutoRefresh] active sprint issues ok (${merged[i].issues.length} issues)`);
+      refreshLog(`[AutoRefresh] active sprint issues ok (${merged[i].issues.length} issues)`);
     } catch (e) {
       console.warn('[SilentRefresh] active sprint:', e);
     }
   }
 
   if (sprintsChanged(old, merged, activeId)) {
-    console.log('[AutoRefresh] sprint data changed → patching UI (no-anim)');
+    refreshLog('[AutoRefresh] sprint data changed → patching UI (no-anim)');
     suppressSprintAnimOnce();                 // patch the charts without replaying the draw-in
     setSprintViewState({ sprints: merged });  // repaints only #sprint-content-mount
     persistCurrent();
   } else {
-    console.log('[AutoRefresh] sprint data unchanged — no repaint');
+    refreshLog('[AutoRefresh] sprint data unchanged — no repaint');
   }
 }
 
 async function refreshEpicsOnly() {
   const s = getState();
   if (s.view !== VIEW.EPIC) {
-    console.log('[AutoRefresh] epic refresh skipped — not on Epic tab');
+    refreshLog('[AutoRefresh] epic refresh skipped — not on Epic tab');
     return;
   }
   if (!s.epics.length) {
-    console.log('[AutoRefresh] epic refresh skipped — no epics loaded yet');
+    refreshLog('[AutoRefresh] epic refresh skipped — no epics loaded yet');
     return;
   }
   const ctx = await resolveApiContext();
@@ -949,19 +950,19 @@ async function refreshEpicsOnly() {
   const { workerUrl, boardId } = ctx;
 
   const toRefresh = s.epics.filter(shouldRefreshEpic);
-  console.log(`[AutoRefresh] epic refresh: ${toRefresh.length} epic(s) (cycle #${_silentCycle}, sweep=${_silentCycle % 4 === 0}): ${toRefresh.map(e => e.key).join(', ')}`);
+  refreshLog(`[AutoRefresh] epic refresh: ${toRefresh.length} epic(s) (cycle #${_silentCycle}, sweep=${_silentCycle % 4 === 0}): ${toRefresh.map(e => e.key).join(', ')}`);
 
   let patched = false;
   // Sequential (await in the loop) so we never fire a burst of /epic calls.
   for (const epic of toRefresh) {
     try {
-      console.log(`[AutoRefresh]   fetching ${epic.key}...`);
+      refreshLog(`[AutoRefresh]   fetching ${epic.key}...`);
       const enriched = await fetchEnrichedEpic(epic, workerUrl, boardId);
       if (!epicChanged(epic, enriched)) {
-        console.log(`[AutoRefresh]   ${epic.key} — no change`);
+        refreshLog(`[AutoRefresh]   ${epic.key} — no change`);
         continue;
       }
-      console.log(`[AutoRefresh]   ${epic.key} — changed, patching`);
+      refreshLog(`[AutoRefresh]   ${epic.key} — changed, patching`);
       patchEpicInState(epic.id, enriched);
       patched = true;
     } catch (e) {

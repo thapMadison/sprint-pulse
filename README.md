@@ -71,6 +71,24 @@ After deployment, you'll get a URL like `https://jira-proxy.<subdomain>.workers.
    - **XML**: Jira's RSS / XML view (`https://<host>/sr/jira.issueviews:searchrequest-xml/...`). Pulls `<key>`, `<summary>`, `<status>`, `<assignee>`, `<timeoriginalestimate seconds="…">`, `<timespent seconds="…">`, `<timeestimate seconds="…">`, and the `<customfield name="Sprint">` blob (including embedded start/end/state).
    - **JSON**: either an array of pre-shaped issue records, or a Jira REST search response of the form `{ "issues": [ { "key": "...", "fields": { ... } }, ... ] }`.
 
+## Debugging
+
+When the **Jira API** source is active, a background poller refreshes the data
+every 5 minutes (with failure backoff and tab-visibility pausing). Its verbose
+tracing is **off by default** so the console stays quiet. To diagnose
+polling / backoff behaviour, enable it at runtime from the browser devtools
+console — no reload needed:
+
+```js
+localStorage.setItem('sprint_pulse_debug', '1');   // enable
+localStorage.removeItem('sprint_pulse_debug');      // disable
+```
+
+With the flag on, you'll see `[AutoRefresh] …` traces for each cycle (skip
+reasons, fetches, change detection, per-epic refresh, next-tick delay). Error
+logs (`console.warn` on a failed cycle, cache/auth failures) always print,
+regardless of the flag.
+
 ## What gets computed client-side
 
 | Metric | Logic |
