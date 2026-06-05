@@ -12,8 +12,9 @@ import * as cache from '../services/data-cache.js';
 import {
   fetchSprintFromWorker, fetchSprintListFromWorker, fetchBoardFromWorker,
   fetchEpicsFromWorker, fetchEpicIssuesFromWorker, fetchIssueDetailFromWorker,
+  fetchStatusesFromWorker,
 } from '../services/jira-api.js';
-import { buildColorMapFromIssues } from '../domain/status-colors.js';
+import { buildColorMapFromIssues, buildStatusColorMap } from '../domain/status-colors.js';
 import { setState, setStateSilent, setEpicRoadmapState, setEpicViewState, setSprintViewState, setLoadProgressState, setDataSourceState, setViewState, setErrorState, setTopbarState, getState, suppressIntroAnimOnce, suppressSprintAnimOnce, DEFAULT_EPIC_FILTERS } from './state.js';
 import { DEMO_EPICS } from '../data/demo.js';
 import { VIEW, SOURCE } from './constants.js';
@@ -103,6 +104,7 @@ function snapshotData(s) {
     today: s.today,
     rawEpics: s.rawEpics,
     epics: s.epics,
+    statusColorMap: s.statusColorMap,
     lastUpdated: s.lastUpdated,
   };
 }
@@ -132,6 +134,7 @@ function restoreSnapshot(snap, extra = {}) {
     lastUpdated: snap.lastUpdated || null,
     rawEpics: snap.rawEpics || [],
     epics: snap.epics || [],
+    statusColorMap: snap.statusColorMap || {},
     error: null,
     isRefreshing: false,
     epicLoadProgress: null,
@@ -211,12 +214,13 @@ async function loadSprintDetail(sprintId) {
     );
     setSprintViewState({ sprints: updated });
 
-    // Rebuild the colour map from all loaded sprint issues. This is the
-    // authoritative source for status→category on this specific board —
-    // the global /statuses API returns statuses from every Jira project and
-    // causes cross-project name collisions that corrupt colour assignments.
-    const allIssues = updated.flatMap((sp) => sp.issues || []);
-    if (allIssues.length) setStateSilent({ statusColorMap: buildColorMapFromIssues(allIssues) });
+    // Fallback colour map from loaded sprint issues — only when the authoritative
+    // board-wide map (built from the project's full status list in fetchAndApplyBoard)
+    // is unavailable, e.g. multi-project / JQL boards with no single projectKey.
+    if (Object.keys(getState().statusColorMap).length === 0) {
+      const allIssues = updated.flatMap((sp) => sp.issues || []);
+      if (allIssues.length) setStateSilent({ statusColorMap: buildColorMapFromIssues(allIssues) });
+    }
 
     // Cache the newly-loaded issues so re-selecting this sprint (or a page
     // refresh) doesn't re-fetch them.
@@ -495,13 +499,16 @@ async function loadSingleEpic(epicKey) {
       setEpicRoadmapState({ epics: updatedEpics });
     }
 
-    // Merge epic tasks into the colour map so statuses that only appear in
-    // historical sprints get the same colour across sprint and epic views.
-    const allIssues = [
-      ...getState().sprints.flatMap((sp) => sp.issues || []),
-      ...(enrichedEpic.tasks || []),
-    ];
-    if (allIssues.length) setStateSilent({ statusColorMap: buildColorMapFromIssues(allIssues) });
+    // Fallback only: when the authoritative board-wide map is unavailable, merge
+    // epic tasks into the colour map so statuses that only appear in historical
+    // sprints get the same colour across sprint and epic views.
+    if (Object.keys(getState().statusColorMap).length === 0) {
+      const allIssues = [
+        ...getState().sprints.flatMap((sp) => sp.issues || []),
+        ...(enrichedEpic.tasks || []),
+      ];
+      if (allIssues.length) setStateSilent({ statusColorMap: buildColorMapFromIssues(allIssues) });
+    }
   } catch (e) {
     console.warn(`[Epic] single epic load failed for ${epicKey}:`, e);
   }
@@ -685,13 +692,22 @@ async function fetchAndApplyBoard(boardId, { extra = {}, keepActiveId = null } =
 
   localStorage.setItem(BOARD_ID_KEY, boardId);
   setProgress('fetch');
-  // Board name is best-effort; fall back to id on failure.
-  const [board, rawSprints] = await Promise.all([
+  // Board name + status list are best-effort; fall back gracefully on failure.
+  const [board, rawSprints, statuses] = await Promise.all([
     fetchBoardFromWorker(workerUrl, boardId).catch(() => null),
     fetchSprintListFromWorker(workerUrl, boardId),
+    fetchStatusesFromWorker(workerUrl, boardId).catch(() => []),
   ]);
   if (!rawSprints || !rawSprints.length) {
     throw new Error(t('action.noSprintsCheckConfig'));
+  }
+
+  // Authoritative board-wide status→colour map from the project's full workflow
+  // status list. Set once up front so every status (incl. ones only seen in
+  // history) gets a stable colour; the per-sprint/epic fallbacks below only fill
+  // in when this is empty (e.g. multi-project boards with no single projectKey).
+  if (statuses && statuses.length) {
+    setStateSilent({ statusColorMap: buildStatusColorMap(statuses) });
   }
 
   setProgress('process');
