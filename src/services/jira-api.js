@@ -28,6 +28,12 @@ export async function fetchSprintListFromWorker(workerUrl, boardId) {
   return workerGet(workerUrl, `/sprints?boardId=${encodeURIComponent(boardId)}`);
 }
 
+// Fetch the board's backlog issues (not assigned to any sprint), with changelog.
+// Same issue shape as /sprint/:id — the client builds a synthetic Backlog sprint.
+export async function fetchBacklogFromWorker(workerUrl, boardId) {
+  return workerGet(workerUrl, `/backlog?boardId=${encodeURIComponent(boardId)}`);
+}
+
 // Fetch the board's project workflow status list ([{ id, name, categoryKey }]).
 // Authoritative source for the board-wide status→colour map; returns [] for
 // boards without a single projectKey (caller falls back to issue-derived colours).

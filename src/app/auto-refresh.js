@@ -17,6 +17,7 @@
 //     node-env test suite importing actions.js clean).
 
 import { silentRefresh } from './actions.js';
+import { refreshLog } from './debug.js';
 
 const BASE = 5 * 60 * 1000;   // 5 minutes — see plan's Jira rate-limit analysis
 const FIRST = 30 * 1000;      // 30 seconds — first cycle fires quickly after page load
@@ -37,13 +38,13 @@ export function startAutoRefresh() {
   _firstCycle = true;           // reset so next start always does the quick first-check
   wireVisibility();
   schedule();
-  console.log(`[AutoRefresh] started — first cycle in ${FIRST / 1000}s, then every ${BASE / 1000}s`);
+  refreshLog(`[AutoRefresh] started — first cycle in ${FIRST / 1000}s, then every ${BASE / 1000}s`);
 }
 
 export function stopAutoRefresh() {
   _enabled = false;
   if (_id) { clearTimeout(_id); _id = null; }
-  console.log(`[AutoRefresh] stopped`);
+  refreshLog(`[AutoRefresh] stopped`);
 }
 
 function schedule() {
@@ -51,29 +52,29 @@ function schedule() {
   if (!_enabled) return;
   const delay = _firstCycle ? FIRST : _wait;
   _id = setTimeout(tick, delay);
-  console.log(`[AutoRefresh] next tick in ${delay / 1000}s (at ~${new Date(Date.now() + delay).toLocaleTimeString()})`);
+  refreshLog(`[AutoRefresh] next tick in ${delay / 1000}s (at ~${new Date(Date.now() + delay).toLocaleTimeString()})`);
 }
 
 async function tick() {
   // Skip the network work while hidden (still reschedules so we resume on return);
   // skip if a previous cycle is somehow still running (slow worker).
   if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-    console.log(`[AutoRefresh] ${ts()} — tab hidden, skipping (will refresh on return)`);
+    refreshLog(`[AutoRefresh] ${ts()} — tab hidden, skipping (will refresh on return)`);
     schedule();
     return;
   }
   if (_inFlight) {
-    console.log(`[AutoRefresh] ${ts()} — previous cycle still running, skipping`);
+    refreshLog(`[AutoRefresh] ${ts()} — previous cycle still running, skipping`);
     schedule();
     return;
   }
   _firstCycle = false;          // subsequent calls use _wait (5 min)
   _inFlight = true;
-  console.log(`[AutoRefresh] ${ts()} — cycle start`);
+  refreshLog(`[AutoRefresh] ${ts()} — cycle start`);
   try {
     await silentRefresh();
     _wait = BASE;
-    console.log(`[AutoRefresh] ${ts()} — cycle done ✓ (next in ${_wait / 1000}s)`);
+    refreshLog(`[AutoRefresh] ${ts()} — cycle done ✓ (next in ${_wait / 1000}s)`);
   } catch (e) {
     _wait = Math.min(_wait * 2, MAX);
     console.warn(`[AutoRefresh] ${ts()} — cycle failed, backoff → ${_wait / 1000}s:`, e);
@@ -88,7 +89,7 @@ function wireVisibility() {
   _wired = true;
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible' && _enabled && !_inFlight) {
-      console.log(`[AutoRefresh] ${ts()} — tab visible again, refreshing now`);
+      refreshLog(`[AutoRefresh] ${ts()} — tab visible again, refreshing now`);
       _wait = BASE;
       tick();
     }

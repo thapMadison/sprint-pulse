@@ -98,6 +98,23 @@ export const DEMO_SPRINTS = [
       issue('ATL-505', 'Multi-board comparison view', 2, 'todo', 14, 0, 14, 'Medium', 'Story'),
     ],
   },
+  {
+    // Issues triaged into the project but not yet pulled into a sprint.
+    id: 'backlog',
+    name: 'Backlog',
+    goal: '',
+    startDate: null,
+    endDate: null,
+    state: 'backlog',
+    issues: [
+      issue('ATL-601', 'Custom dashboard layouts (drag & drop)', 0, 'todo', 20, 0, 20, 'Medium', 'Story', 'Backlog'),
+      issue('ATL-602', 'SSO with Google Workspace', 1, 'todo', 12, 0, 12, 'Medium', 'Story', 'Backlog'),
+      issue('ATL-603', 'Dark/light theme per-user preference sync', 2, 'todo', 5, 0, 5, 'Low', 'Task', 'Backlog'),
+      issue('ATL-604', 'Bulk CSV import for historical sprints', 3, 'todo', 10, 0, 10, 'Medium', 'Story', 'Backlog'),
+      issue('ATL-605', 'Mobile-responsive workload table', 4, 'todo', 8, 0, 8, 'Low', 'Task', 'Backlog'),
+      issue('ATL-606', 'Webhook integration for live updates', 1, 'todo', 14, 0, 14, 'High', 'Story', 'Backlog'),
+    ],
+  },
 ];
 
 // =========== Demo Epic metadata + issue→epic mapping ============

@@ -12,7 +12,7 @@ Sprint Pulse is a zero-build, vanilla HTML/CSS/JS Jira analytics dashboard. Ever
 - `src/domain/` — pure logic. `status.js` collapses `statusCategory` → `todo|inprogress|done` (name-based fallback for CSV); `working-days.js` excludes Sat/Sun; `series.js` produces the daily series for every chart; `sprint-builder.js` and `epic-builder.js` group raw issues into the normalized shapes.
 - `src/charts/` — SVG renderers. `svg.js` is the shared `svg()` / `path()` / `smoothPath()` helper; each chart file (`burndown`, `burnup`, `cfd`, `control`, `donut`, `epic-roadmap`) returns a detached DOM node. `burndown`/`burnup` are thin configs over the shared `area-line-chart.js` renderer.
 - `src/ui/` — `dom.js` exports the `el()` helper used everywhere; `chart-helpers.js` holds shared axis/scale utilities; `hero-helpers.js` holds the date/meta cells shared by the Sprint and Epic hero cards; `format.js` holds shared label helpers (`statusLabel`, `shortSprintName`); `components/` exports one `renderX()` function per file.
-- `cloudflare-worker/` — Worker proxy (`worker-dashboard.js` + `wrangler.toml`) that holds Jira credentials and exposes `/board`, `/sprints`, `/sprint/:id`, `/all`, `/epics`, `/epic/:key`. The browser only knows the Worker URL plus `boardId`.
+- `cloudflare-worker/` — Worker proxy (`worker-dashboard.js` + `wrangler.toml`) that holds Jira credentials and exposes `/board`, `/sprints`, `/backlog`, `/sprint/:id`, `/all`, `/epics`, `/epic/:key`. The browser only knows the Worker URL plus `boardId`.
 
 `assets/styles.css` is the design-system port (treat as 1-for-1 with the source design); `assets/extras.css` is reserved for additions that don't belong in the ported file.
 

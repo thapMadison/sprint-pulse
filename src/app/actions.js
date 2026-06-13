@@ -2,7 +2,7 @@
 // Components dispatch through these functions and read via getState().
 import { DEMO_SPRINTS, DEMO_TODAY } from '../data/demo.js';
 import { todayISO } from '../domain/working-days.js';
-import { buildSprintsFromIssues, buildSprintShells, populateSprintIssues } from '../domain/sprint-builder.js';
+import { buildSprintsFromIssues, buildSprintShells, populateSprintIssues, buildBacklogShell, BACKLOG_ID } from '../domain/sprint-builder.js';
 import { buildLightweightEpics, enrichEpicWithDetail, buildStubEpic } from '../domain/epic-builder.js';
 import { parseFile } from '../data/parsers/index.js';
 import {
@@ -12,13 +12,14 @@ import * as cache from '../services/data-cache.js';
 import {
   fetchSprintFromWorker, fetchSprintListFromWorker, fetchBoardFromWorker,
   fetchEpicsFromWorker, fetchEpicIssuesFromWorker, fetchIssueDetailFromWorker,
-  fetchStatusesFromWorker,
+  fetchStatusesFromWorker, fetchBacklogFromWorker,
 } from '../services/jira-api.js';
 import { buildColorMapFromIssues, buildStatusColorMap } from '../domain/status-colors.js';
 import { setState, setStateSilent, setEpicRoadmapState, setEpicViewState, setSprintViewState, setLoadProgressState, setDataSourceState, setViewState, setErrorState, setTopbarState, getState, suppressIntroAnimOnce, suppressSprintAnimOnce, DEFAULT_EPIC_FILTERS } from './state.js';
 import { DEMO_EPICS } from '../data/demo.js';
 import { VIEW, SOURCE } from './constants.js';
 import { startAutoRefresh, stopAutoRefresh } from './auto-refresh.js';
+import { refreshLog } from './debug.js';
 import { setActiveLang, isSupported, LANG_STORAGE_KEY, t } from './i18n.js';
 import { setActiveTheme, isSupportedTheme, applyTheme, THEME_STORAGE_KEY } from './theme.js';
 
@@ -194,6 +195,26 @@ async function loadSprintDetail(sprintId) {
   if (!workerUrl) { markSprintLoaded(sprintId, t('action.workerNotConfigured')); return; }
   const boardId = localStorage.getItem(BOARD_ID_KEY);
   if (!boardId) { markSprintLoaded(sprintId, t('action.boardIdNotSet')); return; }
+
+  // The Backlog group has no jiraId — it loads from the dedicated /backlog endpoint.
+  if (sprintId === BACKLOG_ID) {
+    try {
+      const data = await fetchBacklogFromWorker(workerUrl, boardId);
+      const latest = getState();
+      const updated = latest.sprints.map((sp) =>
+        sp.id === BACKLOG_ID ? populateSprintIssues(sp, data.issues || []) : sp
+      );
+      setSprintViewState({ sprints: updated });
+      if (Object.keys(getState().statusColorMap).length === 0) {
+        const allIssues = updated.flatMap((sp) => sp.issues || []);
+        if (allIssues.length) setStateSilent({ statusColorMap: buildColorMapFromIssues(allIssues) });
+      }
+      persistCurrent();
+    } catch (e) {
+      markSprintLoaded(sprintId, e.message || String(e));
+    }
+    return;
+  }
 
   // Resolve the Jira numeric sprint ID. Shells carry jiraId from /sprints; fall
   // back to a name lookup just in case it's missing.
@@ -711,7 +732,9 @@ async function fetchAndApplyBoard(boardId, { extra = {}, keepActiveId = null } =
   }
 
   setProgress('process');
-  const sprints = buildSprintShells(rawSprints, getState().today);
+  // Append the always-present Backlog shell so its filter pill shows even before
+  // (or without) any backlog issues; its issues load on demand from /backlog.
+  const sprints = [...buildSprintShells(rawSprints, getState().today), buildBacklogShell(getState().today)];
   applyLoadedSprints(sprints, apiSourceLabel(board, boardId), 'api', { sourceId: boardId, jiraUrl, ...extra });
   // Keep the user on the sprint they were viewing if it still exists.
   if (keepActiveId && sprints.some((sp) => sp.id === keepActiveId)) {
@@ -853,24 +876,24 @@ function epicChanged(prev, next) {
 export async function silentRefresh() {
   const s = getState();
   if (s.sourceKey !== SOURCE.API) {
-    console.log('[AutoRefresh] silentRefresh skipped — not API source:', s.sourceKey);
+    refreshLog('[AutoRefresh] silentRefresh skipped — not API source:', s.sourceKey);
     return;
   }
   if (s.isRefreshing || s.loadProgress || s.epicLoadProgress) {
-    console.log('[AutoRefresh] silentRefresh skipped — manual refresh/load in progress');
+    refreshLog('[AutoRefresh] silentRefresh skipped — manual refresh/load in progress');
     return;
   }
   if (!isAuthenticated()) {
-    console.log('[AutoRefresh] silentRefresh skipped — not authenticated');
+    refreshLog('[AutoRefresh] silentRefresh skipped — not authenticated');
     return;
   }
   if (!localStorage.getItem(BOARD_ID_KEY)) {
-    console.log('[AutoRefresh] silentRefresh skipped — no boardId');
+    refreshLog('[AutoRefresh] silentRefresh skipped — no boardId');
     return;
   }
 
   _silentCycle++;
-  console.log(`[AutoRefresh] silentRefresh cycle #${_silentCycle} (view: ${s.view})`);
+  refreshLog(`[AutoRefresh] silentRefresh cycle #${_silentCycle} (view: ${s.view})`);
   await refreshSprintsOnly();  // top-level fetch errors propagate → auto-refresh backs off
   await refreshEpicsOnly();    // no-op unless on the Epic tab
 
@@ -881,7 +904,7 @@ export async function silentRefresh() {
   setStateSilent({ lastUpdated: new Date() });
   persistCurrent();   // save updated timestamp to cache so F5 restore shows correct age
   setDataSourceState({});
-  console.log('[AutoRefresh] timestamp bumped → "Updated just now"');
+  refreshLog('[AutoRefresh] timestamp bumped → "Updated just now"');
 }
 
 async function refreshSprintsOnly() {
@@ -889,13 +912,13 @@ async function refreshSprintsOnly() {
   if (!ctx) return;
   const { workerUrl, boardId } = ctx;
 
-  console.log('[AutoRefresh] fetching sprint list...');
+  refreshLog('[AutoRefresh] fetching sprint list...');
   const rawSprints = await fetchSprintListFromWorker(workerUrl, boardId);
   if (!rawSprints || !rawSprints.length) {
-    console.log('[AutoRefresh] sprint list empty — skipping');
+    refreshLog('[AutoRefresh] sprint list empty — skipping');
     return;
   }
-  console.log(`[AutoRefresh] sprint list ok (${rawSprints.length} sprints)`);
+  refreshLog(`[AutoRefresh] sprint list ok (${rawSprints.length} sprints)`);
 
   const old = getState().sprints;
   // Rebuild shells from the fresh list, but carry over already-loaded issues for
@@ -909,39 +932,52 @@ async function refreshSprintsOnly() {
     return shell;
   });
 
+  // Preserve the always-present Backlog shell (and its issues if already loaded);
+  // it isn't in the /sprints list, so rebuilding from that list would drop it.
+  const prevBacklog = old.find((o) => o.id === BACKLOG_ID);
+  merged.push(prevBacklog || buildBacklogShell(getState().today));
+
   // Re-fetch issues for the sprint the user is actually looking at.
   const activeId = getState().activeSprintId;
   const activeSprint = merged.find((sp) => sp.id === activeId);
-  console.log(`[AutoRefresh] fetching active sprint issues (${activeSprint?.name || activeId})...`);
+  refreshLog(`[AutoRefresh] fetching active sprint issues (${activeSprint?.name || activeId})...`);
   const i = merged.findIndex((sp) => sp.id === activeId);
-  if (i >= 0 && merged[i].jiraId) {
+  if (i >= 0 && activeId === BACKLOG_ID) {
+    try {
+      const data = await fetchBacklogFromWorker(workerUrl, boardId);
+      merged[i] = populateSprintIssues(merged[i], data.issues || []);
+      refreshLog(`[AutoRefresh] backlog issues ok (${merged[i].issues.length} issues)`);
+    } catch (e) {
+      console.warn('[SilentRefresh] backlog:', e);
+    }
+  } else if (i >= 0 && merged[i].jiraId) {
     try {
       const data = await fetchSprintFromWorker(workerUrl, merged[i].jiraId, boardId);
       merged[i] = populateSprintIssues(merged[i], data.issues || []);
-      console.log(`[AutoRefresh] active sprint issues ok (${merged[i].issues.length} issues)`);
+      refreshLog(`[AutoRefresh] active sprint issues ok (${merged[i].issues.length} issues)`);
     } catch (e) {
       console.warn('[SilentRefresh] active sprint:', e);
     }
   }
 
   if (sprintsChanged(old, merged, activeId)) {
-    console.log('[AutoRefresh] sprint data changed → patching UI (no-anim)');
+    refreshLog('[AutoRefresh] sprint data changed → patching UI (no-anim)');
     suppressSprintAnimOnce();                 // patch the charts without replaying the draw-in
     setSprintViewState({ sprints: merged });  // repaints only #sprint-content-mount
     persistCurrent();
   } else {
-    console.log('[AutoRefresh] sprint data unchanged — no repaint');
+    refreshLog('[AutoRefresh] sprint data unchanged — no repaint');
   }
 }
 
 async function refreshEpicsOnly() {
   const s = getState();
   if (s.view !== VIEW.EPIC) {
-    console.log('[AutoRefresh] epic refresh skipped — not on Epic tab');
+    refreshLog('[AutoRefresh] epic refresh skipped — not on Epic tab');
     return;
   }
   if (!s.epics.length) {
-    console.log('[AutoRefresh] epic refresh skipped — no epics loaded yet');
+    refreshLog('[AutoRefresh] epic refresh skipped — no epics loaded yet');
     return;
   }
   const ctx = await resolveApiContext();
@@ -949,19 +985,19 @@ async function refreshEpicsOnly() {
   const { workerUrl, boardId } = ctx;
 
   const toRefresh = s.epics.filter(shouldRefreshEpic);
-  console.log(`[AutoRefresh] epic refresh: ${toRefresh.length} epic(s) (cycle #${_silentCycle}, sweep=${_silentCycle % 4 === 0}): ${toRefresh.map(e => e.key).join(', ')}`);
+  refreshLog(`[AutoRefresh] epic refresh: ${toRefresh.length} epic(s) (cycle #${_silentCycle}, sweep=${_silentCycle % 4 === 0}): ${toRefresh.map(e => e.key).join(', ')}`);
 
   let patched = false;
   // Sequential (await in the loop) so we never fire a burst of /epic calls.
   for (const epic of toRefresh) {
     try {
-      console.log(`[AutoRefresh]   fetching ${epic.key}...`);
+      refreshLog(`[AutoRefresh]   fetching ${epic.key}...`);
       const enriched = await fetchEnrichedEpic(epic, workerUrl, boardId);
       if (!epicChanged(epic, enriched)) {
-        console.log(`[AutoRefresh]   ${epic.key} — no change`);
+        refreshLog(`[AutoRefresh]   ${epic.key} — no change`);
         continue;
       }
-      console.log(`[AutoRefresh]   ${epic.key} — changed, patching`);
+      refreshLog(`[AutoRefresh]   ${epic.key} — changed, patching`);
       patchEpicInState(epic.id, enriched);
       patched = true;
     } catch (e) {

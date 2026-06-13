@@ -3,6 +3,8 @@ import {
   buildSprintsFromIssues,
   buildSprintShells,
   populateSprintIssues,
+  buildBacklogShell,
+  BACKLOG_ID,
 } from '../../src/domain/sprint-builder.js';
 
 const TODAY = '2026-05-22';
@@ -65,6 +67,26 @@ describe('buildSprintShells', () => {
   it('leaves shells with issuesLoaded false', () => {
     const shells = buildSprintShells([{ id: 1, name: 'S', startDate: '2026-05-11', endDate: '2026-05-29' }], TODAY);
     expect(shells[0].issuesLoaded).toBe(false);
+  });
+});
+
+describe('buildBacklogShell', () => {
+  it('builds an always-present, unloaded Backlog shell pinned to the backlog state', () => {
+    const shell = buildBacklogShell(TODAY);
+    expect(shell.id).toBe(BACKLOG_ID);
+    expect(shell.name).toBe('Backlog');
+    expect(shell.state).toBe('backlog');
+    expect(shell.jiraId).toBeNull();
+    expect(shell.issuesLoaded).toBe(false);
+    expect(shell.startDate).toBe(TODAY);
+    expect(shell.endDate).toBe(TODAY);
+  });
+
+  it('fills via populateSprintIssues like a sprint shell', () => {
+    const populated = populateSprintIssues(buildBacklogShell(TODAY), RAW_ISSUES.slice(0, 1));
+    expect(populated.issuesLoaded).toBe(true);
+    expect(populated.issues).toHaveLength(1);
+    expect(populated.state).toBe('backlog');
   });
 });
 

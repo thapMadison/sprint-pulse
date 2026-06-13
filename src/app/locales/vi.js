@@ -87,6 +87,7 @@ export default {
   'sprintFilter.active': 'Đang chạy',
   'sprintFilter.future': 'Sắp tới',
   'sprintFilter.closed': 'Đã đóng',
+  'sprintFilter.backlog': 'Backlog',
 
   // ── Progress overlay (load steps) ─────────────────────────────────────────────
   'progress.connect': 'Kết nối',
