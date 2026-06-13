@@ -14,7 +14,7 @@ const ALLOWED_ORIGINS = [
   'http://127.0.0.1:8080',
   // Add your production domains:
   // 'https://your-app.github.io',
-  // 'https://your-app.pages.dev',
+  'https://sprint-pulse.madlab.tech',
 ];
 
 function corsHeaders(origin) {
@@ -90,6 +90,91 @@ export default {
           return json({ projectKey: maps.projectKey, count: maps.list.length, list: maps.list }, 200, cors);
         }
         return json(maps.list, 200, cors);
+      }
+
+      // GET /backlog - Issues on the board's backlog (not assigned to any sprint).
+      // Mirrors the /sprint/:id issue shape (with changelog + authoritative status
+      // maps) so the client can build a synthetic "Backlog" sprint the same way it
+      // builds a real one. Issues are tagged sprintName:null / sprintState:'backlog'.
+      if (path === '/backlog') {
+        // Resolve the board's project so we can use JQL. The Jira Backlog UI is a JQL
+        // view, not the raw agile /backlog feed (that feed returns the whole board —
+        // thousands of issues — on Kanban-style boards).
+        const projectKey = await resolveBoardProjectKey(env, headers, boardId);
+
+        const sprintFieldId = env.SPRINT_FIELD_ID || 'customfield_10020';
+
+        // Backlog = issues in this project that belong to NO sprint, aren't Done, and
+        // are real work items (Task / Story / Bug — not Epic or Sub-task). Note the
+        // Jira Backlog UI also surfaces a few items still attached to a CLOSED sprint;
+        // those are intentionally excluded here (sprint IS EMPTY) so the set is the
+        // true, un-sprinted backlog. Falls back to the raw agile /backlog feed only
+        // for multi-project boards with no single projectKey.
+        const allRaw = [];
+        if (projectKey) {
+          const jql = `project = ${projectKey} AND sprint IS EMPTY AND statusCategory != Done AND issuetype IN (Task, Story, Bug) ORDER BY created ASC`;
+          // No changelog: the backlog view has no time-series charts, so per-issue
+          // history isn't needed — and skipping it lets us page at 5000/req (one
+          // request for most backlogs), staying well under the Free-plan subrequest cap.
+          const fields = 'summary,status,assignee,timetracking,issuetype,priority,created,updated,parent';
+          allRaw.push(...await searchAllByJql(env, headers, jql, fields, false));
+        } else {
+          let startAt = 0;
+          const PAGE = 100;
+          for (let i = 0; i < 30; i++) {
+            const page = await jiraFetch(
+              `${env.JIRA_BASE_URL}/rest/agile/1.0/board/${boardId}/backlog?fields=summary,status,assignee,timetracking,issuetype,priority,created,updated,parent,${sprintFieldId}&expand=changelog&startAt=${startAt}&maxResults=${PAGE}`,
+              headers
+            );
+            const vals = page.issues || [];
+            allRaw.push(...vals);
+            const total = page.total ?? allRaw.length;
+            startAt += vals.length;
+            if (vals.length === 0 || startAt >= total) break;
+          }
+        }
+
+        const workflowMaps = await fetchProjectStatusMaps(env, headers, boardId);
+        const rawIssues = allRaw;
+
+        // Authoritative name→/id→category maps: project workflow base overlaid with
+        // each backlog issue's current status (same approach as /sprint/:id).
+        const statusCategoryByName = { ...workflowMaps.byName };
+        const statusCategoryById = { ...workflowMaps.byId };
+        for (const iss of rawIssues) {
+          const st = iss.fields?.status;
+          if (st?.name && st?.statusCategory) statusCategoryByName[st.name] = st.statusCategory;
+          if (st?.id && st?.statusCategory) statusCategoryById[String(st.id)] = st.statusCategory;
+        }
+
+        const issues = rawIssues.map((iss) => {
+          const f = iss.fields || {};
+          const tt = f.timetracking || {};
+          const assignee = f.assignee || {};
+          const status = f.status || { name: 'To Do', statusCategory: { key: 'new' } };
+          return {
+            key: iss.key,
+            summary: f.summary || '',
+            type: f.issuetype?.name || 'Task',
+            priority: f.priority?.name || 'Medium',
+            status,
+            assigneeName: assignee.displayName || 'Unassigned',
+            assigneeId: assignee.accountId || '',
+            originalEstimate: toHours(tt.originalEstimateSeconds),
+            timeSpent: toHours(tt.timeSpentSeconds),
+            remainingEstimate: toHours(tt.remainingEstimateSeconds),
+            sprintName: null,
+            sprintStartDate: null,
+            sprintEndDate: null,
+            sprintState: 'backlog',
+            sprintGoal: '',
+            statusChanges: extractStatusChanges(iss.changelog, f.created, f.updated, status, statusCategoryByName, statusCategoryById),
+            epicKey: f.parent?.key || null,
+            epicName: f.parent?.fields?.summary || null,
+          };
+        });
+
+        return json({ statusCategoryByName, issues }, 200, cors);
       }
 
       // GET /sprint/:id - Get issues for a specific sprint
@@ -423,7 +508,7 @@ export default {
         }, 200, cors);
       }
 
-      return json({ error: 'Not found. Use /board, /sprints, /statuses, /sprint/:id, /all, /epics, /epic/:key, or /issue/:key' }, 404, cors);
+      return json({ error: 'Not found. Use /board, /sprints, /backlog, /statuses, /sprint/:id, /all, /epics, /epic/:key, or /issue/:key' }, 404, cors);
 
     } catch (error) {
       return json({ error: error.message }, 500, cors);
@@ -438,6 +523,44 @@ async function jiraFetch(url, headers) {
     throw new Error(`Jira API ${res.status}: ${body.slice(0, 200)}`);
   }
   return res.json();
+}
+
+// Page through /rest/api/3/search/jql collecting ALL matching issues. Handles both
+// the newer token-paginated response (nextPageToken, no `total`) and the older
+// startAt/total style. `fields` is a comma list; pass changelog=true to expand it.
+async function searchAllByJql(env, headers, jql, fields, changelog = false) {
+  // Big page size minimises requests — Cloudflare's Free plan caps a Worker at 50
+  // subrequests per invocation, so we want as few pages as possible. Jira allows up
+  // to 5000 per page (this instance enforces 1–5000). Without changelog we can use
+  // the max; with changelog the payload is heavier, so use a smaller page.
+  const PAGE = changelog ? 100 : 5000;
+  const expand = changelog ? '&expand=changelog' : '';
+  const all = [];
+  let nextPageToken = null;
+  let startAt = 0;
+
+  for (let i = 0; i < 200; i++) {
+    const tokenParam = nextPageToken ? `&nextPageToken=${encodeURIComponent(nextPageToken)}` : '';
+    const startParam = nextPageToken ? '' : `&startAt=${startAt}`;
+    const page = await jiraFetch(
+      `${env.JIRA_BASE_URL}/rest/api/3/search/jql?jql=${encodeURIComponent(jql)}&fields=${encodeURIComponent(fields)}${expand}&maxResults=${PAGE}${tokenParam}${startParam}`,
+      headers
+    );
+    const vals = page.issues || [];
+    all.push(...vals);
+
+    if (page.nextPageToken) {           // token-paginated API → follow the token
+      nextPageToken = page.nextPageToken;
+      continue;
+    }
+    if (page.total != null) {           // legacy startAt/total API
+      startAt += vals.length;
+      if (vals.length === 0 || startAt >= page.total) break;
+      continue;
+    }
+    break;                              // no token and no total → single/last page
+  }
+  return all;
 }
 
 // Module-level cache of project status maps, keyed by projectKey. A Worker reuses

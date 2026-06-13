@@ -2,7 +2,7 @@
 // Components dispatch through these functions and read via getState().
 import { DEMO_SPRINTS, DEMO_TODAY } from '../data/demo.js';
 import { todayISO } from '../domain/working-days.js';
-import { buildSprintsFromIssues, buildSprintShells, populateSprintIssues } from '../domain/sprint-builder.js';
+import { buildSprintsFromIssues, buildSprintShells, populateSprintIssues, buildBacklogShell, BACKLOG_ID } from '../domain/sprint-builder.js';
 import { buildLightweightEpics, enrichEpicWithDetail, buildStubEpic } from '../domain/epic-builder.js';
 import { parseFile } from '../data/parsers/index.js';
 import {
@@ -12,7 +12,7 @@ import * as cache from '../services/data-cache.js';
 import {
   fetchSprintFromWorker, fetchSprintListFromWorker, fetchBoardFromWorker,
   fetchEpicsFromWorker, fetchEpicIssuesFromWorker, fetchIssueDetailFromWorker,
-  fetchStatusesFromWorker,
+  fetchStatusesFromWorker, fetchBacklogFromWorker,
 } from '../services/jira-api.js';
 import { buildColorMapFromIssues, buildStatusColorMap } from '../domain/status-colors.js';
 import { setState, setStateSilent, setEpicRoadmapState, setEpicViewState, setSprintViewState, setLoadProgressState, setDataSourceState, setViewState, setErrorState, setTopbarState, getState, suppressIntroAnimOnce, suppressSprintAnimOnce, DEFAULT_EPIC_FILTERS } from './state.js';
@@ -195,6 +195,26 @@ async function loadSprintDetail(sprintId) {
   if (!workerUrl) { markSprintLoaded(sprintId, t('action.workerNotConfigured')); return; }
   const boardId = localStorage.getItem(BOARD_ID_KEY);
   if (!boardId) { markSprintLoaded(sprintId, t('action.boardIdNotSet')); return; }
+
+  // The Backlog group has no jiraId — it loads from the dedicated /backlog endpoint.
+  if (sprintId === BACKLOG_ID) {
+    try {
+      const data = await fetchBacklogFromWorker(workerUrl, boardId);
+      const latest = getState();
+      const updated = latest.sprints.map((sp) =>
+        sp.id === BACKLOG_ID ? populateSprintIssues(sp, data.issues || []) : sp
+      );
+      setSprintViewState({ sprints: updated });
+      if (Object.keys(getState().statusColorMap).length === 0) {
+        const allIssues = updated.flatMap((sp) => sp.issues || []);
+        if (allIssues.length) setStateSilent({ statusColorMap: buildColorMapFromIssues(allIssues) });
+      }
+      persistCurrent();
+    } catch (e) {
+      markSprintLoaded(sprintId, e.message || String(e));
+    }
+    return;
+  }
 
   // Resolve the Jira numeric sprint ID. Shells carry jiraId from /sprints; fall
   // back to a name lookup just in case it's missing.
@@ -712,7 +732,9 @@ async function fetchAndApplyBoard(boardId, { extra = {}, keepActiveId = null } =
   }
 
   setProgress('process');
-  const sprints = buildSprintShells(rawSprints, getState().today);
+  // Append the always-present Backlog shell so its filter pill shows even before
+  // (or without) any backlog issues; its issues load on demand from /backlog.
+  const sprints = [...buildSprintShells(rawSprints, getState().today), buildBacklogShell(getState().today)];
   applyLoadedSprints(sprints, apiSourceLabel(board, boardId), 'api', { sourceId: boardId, jiraUrl, ...extra });
   // Keep the user on the sprint they were viewing if it still exists.
   if (keepActiveId && sprints.some((sp) => sp.id === keepActiveId)) {
@@ -910,12 +932,25 @@ async function refreshSprintsOnly() {
     return shell;
   });
 
+  // Preserve the always-present Backlog shell (and its issues if already loaded);
+  // it isn't in the /sprints list, so rebuilding from that list would drop it.
+  const prevBacklog = old.find((o) => o.id === BACKLOG_ID);
+  merged.push(prevBacklog || buildBacklogShell(getState().today));
+
   // Re-fetch issues for the sprint the user is actually looking at.
   const activeId = getState().activeSprintId;
   const activeSprint = merged.find((sp) => sp.id === activeId);
   refreshLog(`[AutoRefresh] fetching active sprint issues (${activeSprint?.name || activeId})...`);
   const i = merged.findIndex((sp) => sp.id === activeId);
-  if (i >= 0 && merged[i].jiraId) {
+  if (i >= 0 && activeId === BACKLOG_ID) {
+    try {
+      const data = await fetchBacklogFromWorker(workerUrl, boardId);
+      merged[i] = populateSprintIssues(merged[i], data.issues || []);
+      refreshLog(`[AutoRefresh] backlog issues ok (${merged[i].issues.length} issues)`);
+    } catch (e) {
+      console.warn('[SilentRefresh] backlog:', e);
+    }
+  } else if (i >= 0 && merged[i].jiraId) {
     try {
       const data = await fetchSprintFromWorker(workerUrl, merged[i].jiraId, boardId);
       merged[i] = populateSprintIssues(merged[i], data.issues || []);

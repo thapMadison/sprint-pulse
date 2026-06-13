@@ -37,6 +37,17 @@ export function makeUserPool() {
 }
 
 function inferDatesAndState(sp, todayDate) {
+  // The synthetic Backlog group is stateless by nature — issues there belong to no
+  // sprint. Pin it to the 'backlog' state and skip date-based active/future/closed
+  // inference (it has no real boundaries).
+  if (sp.state === 'backlog') {
+    if (!sp.startDate || !sp.endDate) {
+      const today = toLocalDateStr(todayDate);
+      sp.startDate = sp.startDate || today;
+      sp.endDate = sp.endDate || today;
+    }
+    return;
+  }
   if (!sp.startDate || !sp.endDate) {
     const end = new Date(todayDate);
     const start = new Date(todayDate);
@@ -77,6 +88,7 @@ export function buildSprintsFromIssues(rawIssues, today) {
   const sprintMap = new Map();
 
   for (const r of rawIssues) {
+    const isBacklog = !r.sprintName;
     const spName = r.sprintName || 'Backlog';
     if (!sprintMap.has(spName)) {
       sprintMap.set(spName, {
@@ -86,7 +98,9 @@ export function buildSprintsFromIssues(rawIssues, today) {
         goal: r.sprintGoal || '',
         startDate: r.sprintStartDate || null,
         endDate: r.sprintEndDate || null,
-        state: r.sprintState || null,
+        // Issues with no sprint collapse into a Backlog group flagged as such, so
+        // the sprint filter can surface a dedicated Backlog pill.
+        state: r.sprintState || (isBacklog ? 'backlog' : null),
         issues: [],
         // Issues built eagerly from a full issue list — already complete.
         issuesLoaded: true,
@@ -132,6 +146,28 @@ export function buildSprintShells(rawSprints, today) {
   });
   shells.sort((a, b) => (a.startDate < b.startDate ? -1 : 1));
   return shells;
+}
+
+// The stable id/slug of the synthetic Backlog group. Shared by the builder, the
+// API-source lazy loader and the sprint filter so they all agree on one key.
+export const BACKLOG_ID = 'backlog';
+
+// Build the always-present Backlog "shell" for the API source. Like a sprint shell
+// it carries metadata only — its issues are pulled on demand from /backlog the first
+// time the Backlog tab is selected. Has no jiraId (loaded via the dedicated endpoint)
+// and is pinned to the 'backlog' state with start/end = today (no real timeline).
+export function buildBacklogShell(today) {
+  return {
+    id: BACKLOG_ID,
+    jiraId: null,
+    name: 'Backlog',
+    goal: '',
+    startDate: today,
+    endDate: today,
+    state: 'backlog',
+    issues: [],
+    issuesLoaded: false,
+  };
 }
 
 // Populate a sprint shell with normalized issues from a /sprint/:id response.

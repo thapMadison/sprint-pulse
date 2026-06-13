@@ -286,6 +286,7 @@ body {
 .sprint-tab .state-dot.active { background: var(--lime); box-shadow: 0 0 8px var(--lime); }
 .sprint-tab .state-dot.closed { background: var(--ink-3); }
 .sprint-tab .state-dot.future { background: var(--amber); }
+.sprint-tab .state-dot.backlog { background: var(--violet); box-shadow: 0 0 8px var(--violet); }
 
 /* ============ Cards ============ */
 .card {

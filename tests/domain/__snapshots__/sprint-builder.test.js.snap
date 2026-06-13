@@ -30,38 +30,6 @@ exports[`buildSprintShells > builds metadata-only shells (golden master) 1`] = `
 exports[`buildSprintsFromIssues > groups, normalizes and infers (golden master) 1`] = `
 [
   {
-    "endDate": "2026-05-22",
-    "goal": "",
-    "id": "backlog",
-    "issues": [
-      {
-        "assignee": {
-          "color": "#fb7185",
-          "id": "unassigned",
-          "initials": "NA",
-          "name": "Unassigned",
-        },
-        "epicKey": null,
-        "epicName": null,
-        "key": "ATL-3",
-        "originalEstimate": 0,
-        "priority": "Low",
-        "remainingEstimate": 0,
-        "status": "todo",
-        "statusChanges": [],
-        "statusName": "To Do",
-        "summary": "Orphan",
-        "timeSpent": 0,
-        "type": "Bug",
-      },
-    ],
-    "issuesLoaded": true,
-    "jiraId": null,
-    "name": "Backlog",
-    "startDate": "2026-05-08",
-    "state": "active",
-  },
-  {
     "endDate": "2026-05-29",
     "goal": "Ship it",
     "id": "sprint-24",
@@ -112,6 +80,38 @@ exports[`buildSprintsFromIssues > groups, normalizes and infers (golden master) 
     "name": "Sprint 24",
     "startDate": "2026-05-11",
     "state": "active",
+  },
+  {
+    "endDate": "2026-05-22",
+    "goal": "",
+    "id": "backlog",
+    "issues": [
+      {
+        "assignee": {
+          "color": "#fb7185",
+          "id": "unassigned",
+          "initials": "NA",
+          "name": "Unassigned",
+        },
+        "epicKey": null,
+        "epicName": null,
+        "key": "ATL-3",
+        "originalEstimate": 0,
+        "priority": "Low",
+        "remainingEstimate": 0,
+        "status": "todo",
+        "statusChanges": [],
+        "statusName": "To Do",
+        "summary": "Orphan",
+        "timeSpent": 0,
+        "type": "Bug",
+      },
+    ],
+    "issuesLoaded": true,
+    "jiraId": null,
+    "name": "Backlog",
+    "startDate": "2026-05-22",
+    "state": "backlog",
   },
 ]
 `;

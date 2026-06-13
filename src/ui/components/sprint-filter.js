@@ -2,8 +2,10 @@ import { el } from '../dom.js';
 import { shortSprintName } from '../format.js';
 import { t } from '../../app/i18n.js';
 
-const STATE_ORDER = { active: 0, future: 1, closed: 2 };
-const STATE_LABEL_KEY = { all: 'sprintFilter.all', active: 'sprintFilter.active', future: 'sprintFilter.future', closed: 'sprintFilter.closed' };
+// Tab order in the "All" list: Backlog first (mirrors Jira's Backlog-on-top
+// layout), then active → future → closed.
+const STATE_ORDER = { backlog: -1, active: 0, future: 1, closed: 2 };
+const STATE_LABEL_KEY = { all: 'sprintFilter.all', active: 'sprintFilter.active', future: 'sprintFilter.future', closed: 'sprintFilter.closed', backlog: 'sprintFilter.backlog' };
 
 // Scroll the horizontal sprint list so the given tab sits in the centre.
 function centerTab(sprintList, btn) {
@@ -18,6 +20,7 @@ export function renderSprintFilter({ sprints, activeId, onChange }) {
     active: sprints.filter((s) => s.state === 'active'),
     future: sprints.filter((s) => s.state === 'future'),
     closed: sprints.filter((s) => s.state === 'closed'),
+    backlog: sprints.filter((s) => s.state === 'backlog'),
   };
 
   let stateFilter = 'all';
@@ -60,9 +63,12 @@ export function renderSprintFilter({ sprints, activeId, onChange }) {
       active: groups.active.length,
       future: groups.future.length,
       closed: groups.closed.length,
+      backlog: groups.backlog.length,
     };
-    for (const state of ['all', 'active', 'future', 'closed']) {
-      if (state !== 'all' && counts[state] === 0) continue;
+    for (const state of ['all', 'active', 'future', 'closed', 'backlog']) {
+      // 'all' and 'backlog' always show; other states hide when empty. The Backlog
+      // pill is a permanent entry point (API source loads its issues on demand).
+      if (state !== 'all' && state !== 'backlog' && counts[state] === 0) continue;
       const isSelected = stateFilter === state;
       const btn = el('button', {
         class: `state-btn state-${state} ${isSelected ? 'selected' : ''}`,

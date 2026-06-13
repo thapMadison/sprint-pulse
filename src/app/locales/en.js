@@ -102,6 +102,7 @@ export default {
   'sprintFilter.active': 'Active',
   'sprintFilter.future': 'Future',
   'sprintFilter.closed': 'Closed',
+  'sprintFilter.backlog': 'Backlog',
 
   // ── Progress overlay (load steps) ─────────────────────────────────────────────
   'progress.connect': 'Connect',

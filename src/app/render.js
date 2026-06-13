@@ -314,6 +314,14 @@ function buildSprintContent(s) {
   // arrive so the charts don't flash empty zeroes.
   if (sprint && sprint.issuesLoaded === false) {
     out.push(...renderSprintSkeleton(sprint));
+  } else if (sprint && sprint.state === 'backlog') {
+    // The backlog has no sprint timeline, so the time-series charts (burndown,
+    // CFD, burnup, control) are meaningless. Show the hero + status breakdown +
+    // workload table only.
+    const hero = renderSprintHero({ sprint, today: s.today });
+    hero.appendChild(renderStatusCard(sprint));
+    out.push(hero);
+    out.push(el('div', { class: 'row' }, [renderWorkloadTable({ sprint, jiraUrl: s.jiraUrl, onOpenTask: openTaskPanel })]));
   } else {
     const series = generateDailySeries(sprint, s.today);
 
